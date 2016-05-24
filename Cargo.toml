@@ -1,0 +1,12 @@
+[package]
+name = "unix"
+version = "0.1.0"
+authors = ["M Farkas-Dyck <strake888@gmail.com>"]
+description = "Interface to Unix system facilities"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+bitflags = "0.7"
+libc = "0.2"
+libreal = "0.12"
+syscall = "0.2"
