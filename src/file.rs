@@ -16,26 +16,26 @@ pub struct File {
 
 #[inline]
 pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode, flags: OpenFlags, f_mode: FileMode) -> Result<File, OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(OPENAT, from_opt_dir(opt_dir), &path[0] as *const _,
+    OsErr::from_sysret(unsafe { syscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(),
                                          flags.bits | o_mode.to_usize(), f_mode.to_usize()) } as isize)
         .map(|fd| File { fd: fd as isize })
 }
 
 #[inline]
 pub fn rename_at(opt_old_dir: Option<&File>, old_path: &OsStr, opt_new_dir: Option<&File>, new_path: &OsStr) -> Result<(), OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(RENAMEAT, from_opt_dir(opt_old_dir), &old_path[0] as *const _,
-                                                   from_opt_dir(opt_new_dir), &new_path[0] as *const _) } as isize).map(|_| ())
+    OsErr::from_sysret(unsafe { syscall!(RENAMEAT, from_opt_dir(opt_old_dir), old_path.as_ptr(),
+                                                   from_opt_dir(opt_new_dir), new_path.as_ptr()) } as isize).map(|_| ())
 }
 
 #[inline]
 pub fn link_at(opt_old_dir: Option<&File>, old_path: &OsStr, opt_new_dir: Option<&File>, new_path: &OsStr) -> Result<(), OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(LINKAT, from_opt_dir(opt_old_dir), &old_path[0] as *const _,
-                                                 from_opt_dir(opt_new_dir), &new_path[0] as *const _) } as isize).map(|_| ())
+    OsErr::from_sysret(unsafe { syscall!(LINKAT, from_opt_dir(opt_old_dir), old_path.as_ptr(),
+                                                 from_opt_dir(opt_new_dir), new_path.as_ptr()) } as isize).map(|_| ())
 }
 
 #[inline]
 pub fn unlink_at(opt_dir: Option<&File>, path: &OsStr) -> Result<(), OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(UNLINKAT, from_opt_dir(opt_dir), &path[0] as *const _) } as isize).map(|_| ())
+    OsErr::from_sysret(unsafe { syscall!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr()) } as isize).map(|_| ())
 }
 
 #[inline]
@@ -107,7 +107,7 @@ impl Read<u8> for File {
 
     #[inline]
     fn readv(&mut self, bufs: &mut [&mut [u8]]) -> Result<usize, Self::Err> {
-        OsErr::from_sysret(unsafe { syscall!(READV, self.fd, &mut bufs[0] as *mut _, bufs.len()) } as isize)
+        OsErr::from_sysret(unsafe { syscall!(READV, self.fd, bufs.as_mut_ptr(), bufs.len()) } as isize)
     }
 }
 
@@ -116,7 +116,7 @@ impl Write<u8> for File {
 
     #[inline]
     fn writev(&mut self, bufs: &[&[u8]]) -> Result<usize, Self::Err> {
-        OsErr::from_sysret(unsafe { syscall!(WRITEV, self.fd, &bufs[0] as *const _, bufs.len()) } as isize)
+        OsErr::from_sysret(unsafe { syscall!(WRITEV, self.fd, bufs.as_ptr(), bufs.len()) } as isize)
     }
 
     #[inline]
