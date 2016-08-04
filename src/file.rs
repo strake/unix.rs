@@ -5,6 +5,8 @@ use libc;
 use libreal::io::*;
 use rand::*;
 
+pub use libc::stat as Stat;
+
 use err::*;
 use str::*;
 
@@ -12,6 +14,15 @@ use self::OpenMode::*;
 
 pub struct File {
     fd: isize
+}
+
+impl File {
+    #[inline]
+    pub fn stat(&self) -> Result<Stat, OsErr> {
+        let mut st = unsafe { mem::uninitialized() };
+        OsErr::from_sysret(unsafe { syscall!(FSTAT, self.fd, &mut st as *mut libc::stat) }
+                           as isize).map(|_| st)
+    }
 }
 
 #[inline]
