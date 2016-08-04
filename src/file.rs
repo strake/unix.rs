@@ -15,27 +15,35 @@ pub struct File {
 }
 
 #[inline]
-pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode, flags: OpenFlags, f_mode: FileMode) -> Result<File, OsErr> {
+pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode, flags: OpenFlags,
+               f_mode: FileMode) -> Result<File, OsErr> {
     OsErr::from_sysret(unsafe { syscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(),
-                                         flags.bits | o_mode.to_usize(), f_mode.to_usize()) } as isize)
-        .map(|fd| File { fd: fd as isize })
+                                         flags.bits | o_mode.to_usize(), f_mode.to_usize()) }
+                       as isize).map(|fd| File { fd: fd as isize })
 }
 
 #[inline]
-pub fn rename_at(opt_old_dir: Option<&File>, old_path: &OsStr, opt_new_dir: Option<&File>, new_path: &OsStr) -> Result<(), OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(RENAMEAT, from_opt_dir(opt_old_dir), old_path.as_ptr(),
-                                                   from_opt_dir(opt_new_dir), new_path.as_ptr()) } as isize).map(|_| ())
+pub fn rename_at(opt_old_dir: Option<&File>, old_path: &OsStr,
+                 opt_new_dir: Option<&File>, new_path: &OsStr) -> Result<(), OsErr> {
+    OsErr::from_sysret(unsafe { syscall!(RENAMEAT,
+                                         from_opt_dir(opt_old_dir), old_path.as_ptr(),
+                                         from_opt_dir(opt_new_dir), new_path.as_ptr()) }
+                       as isize).map(|_| ())
 }
 
 #[inline]
-pub fn link_at(opt_old_dir: Option<&File>, old_path: &OsStr, opt_new_dir: Option<&File>, new_path: &OsStr) -> Result<(), OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(LINKAT, from_opt_dir(opt_old_dir), old_path.as_ptr(),
-                                                 from_opt_dir(opt_new_dir), new_path.as_ptr()) } as isize).map(|_| ())
+pub fn link_at(opt_old_dir: Option<&File>, old_path: &OsStr,
+               opt_new_dir: Option<&File>, new_path: &OsStr) -> Result<(), OsErr> {
+    OsErr::from_sysret(unsafe { syscall!(LINKAT,
+                                         from_opt_dir(opt_old_dir), old_path.as_ptr(),
+                                         from_opt_dir(opt_new_dir), new_path.as_ptr()) }
+                       as isize).map(|_| ())
 }
 
 #[inline]
 pub fn unlink_at(opt_dir: Option<&File>, path: &OsStr) -> Result<(), OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr()) } as isize).map(|_| ())
+    OsErr::from_sysret(unsafe { syscall!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr()) }
+                       as isize).map(|_| ())
 }
 
 #[inline]
@@ -47,13 +55,16 @@ fn from_opt_dir(opt_dir: Option<&File>) -> isize {
 }
 
 #[inline]
-pub fn mktemp_at<R: Clone, TheRng: Rng>(opt_dir: Option<&File>, templ: &mut OsStr, range: R, rng: &mut TheRng, flags: OpenFlags) -> Result<File, OsErr> where [u8]: IndexMut<R, Output = [u8]> {
+pub fn mktemp_at<R: Clone, TheRng: Rng>
+  (opt_dir: Option<&File>, templ: &mut OsStr, range: R, rng: &mut TheRng, flags: OpenFlags) ->
+  Result<File, OsErr> where [u8]: IndexMut<R, Output = [u8]> {
     const EEXIST: usize = libc::EEXIST as usize;
 
     let tries = 0x100;
     for _ in 0..tries {
         randname(rng, &mut templ[range.clone()]);
-        match open_at(opt_dir, templ, RdWr, flags | O_CREAT | O_EXCL, { let mut f_m = FileMode::empty(); f_m.usr = S_IR; f_m }) {
+        match open_at(opt_dir, templ, RdWr, flags | O_CREAT | O_EXCL,
+                      { let mut f_m = FileMode::empty(); f_m.usr = S_IR; f_m }) {
             Err(OsErr::Unknown(EEXIST)) => (),
             r_f => return r_f,
         }
@@ -72,10 +83,12 @@ fn randname<TheRng: Rng>(rng: &mut TheRng, bs: &mut [u8]) {
 }
 
 #[inline]
-pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>(opt_dir: Option<&File>, path: &OsStr, overwrite: bool, writer: F) -> Result<T, OsErr> {
+pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
+  (opt_dir: Option<&File>, path: &OsStr, overwrite: bool, writer: F) -> Result<T, OsErr> {
     let mut rng = {
         let mut seed = 0u64;
-        try!(get_entropy(unsafe { slice::from_raw_parts_mut(&mut seed as *mut _ as *mut u8, mem::size_of_val(&seed)) }));
+        try!(get_entropy(unsafe { slice::from_raw_parts_mut(&mut seed as *mut _ as *mut u8,
+                                                            mem::size_of_val(&seed)) }));
         Isaac64Rng::from_seed(&[seed])
     };
 
@@ -94,7 +107,8 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>(opt_dir: Opt
 
 #[inline]
 fn get_entropy(bs: &mut [u8]) -> Result<(), OsErr> {
-    try!(open_at(None, OsStr::from_bytes(b"/dev/urandom\0"), RdOnly, OpenFlags::empty(), FileMode::empty())).read_full(bs).map_err(|(e, _)| e)
+    try!(open_at(None, OsStr::from_bytes(b"/dev/urandom\0"), RdOnly, OpenFlags::empty(),
+                 FileMode::empty())).read_full(bs).map_err(|(e, _)| e)
 }
 
 impl Drop for File {
@@ -107,7 +121,8 @@ impl Read<u8> for File {
 
     #[inline]
     fn readv(&mut self, bufs: &mut [&mut [u8]]) -> Result<usize, Self::Err> {
-        OsErr::from_sysret(unsafe { syscall!(READV, self.fd, bufs.as_mut_ptr(), bufs.len()) } as isize)
+        OsErr::from_sysret(unsafe { syscall!(READV, self.fd, bufs.as_mut_ptr(), bufs.len()) }
+                           as isize)
     }
 }
 
@@ -116,7 +131,8 @@ impl Write<u8> for File {
 
     #[inline]
     fn writev(&mut self, bufs: &[&[u8]]) -> Result<usize, Self::Err> {
-        OsErr::from_sysret(unsafe { syscall!(WRITEV, self.fd, bufs.as_ptr(), bufs.len()) } as isize)
+        OsErr::from_sysret(unsafe { syscall!(WRITEV, self.fd, bufs.as_ptr(), bufs.len()) }
+                           as isize)
     }
 
     #[inline]
