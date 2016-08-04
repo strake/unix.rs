@@ -1,5 +1,6 @@
 use core::mem;
 use core::ops::*;
+use core::ptr;
 use core::slice;
 use libc;
 use libreal::io::*;
@@ -22,6 +23,24 @@ impl File {
         let mut st = unsafe { mem::uninitialized() };
         OsErr::from_sysret(unsafe { syscall!(FSTAT, self.fd, &mut st as *mut libc::stat) }
                            as isize).map(|_| st)
+    }
+
+    #[inline]
+    pub fn map(&self, loc: Option<*mut u8>, prot: Prot, offset: u64, length: usize) ->
+      Result<Map, OsErr> {
+        let ptr = unsafe { syscall!(MMAP, loc.unwrap_or(ptr::null_mut()), length, prot.bits,
+                                    if loc.is_some() { libc::MAP_FIXED } else { 0 }, self.fd,
+                                    offset) } as *mut u8;
+        if (ptr as usize) > 0x1000usize.wrapping_neg() {
+            Err(OsErr::from((ptr as usize).wrapping_neg()))
+        } else { Ok(Map { ptr: ptr as *mut u8, length: length }) }
+    }
+
+    #[inline]
+    pub fn map_full(&self, loc: Option<*mut u8>, prot: Prot) -> Result<Map, OsErr> {
+        let l = try!(self.stat()).st_size;
+        if ((l as usize) as libc::off_t) != l { Err(OsErr::from(libc::EOVERFLOW as usize)) }
+        else { self.map(loc, prot, 0, l as usize) }
     }
 }
 
@@ -228,5 +247,38 @@ bitflags! {
         const O_CREAT    = libc::O_CREAT    as usize,
         const O_EXCL     = libc::O_EXCL     as usize,
         const O_NONBLOCK = libc::O_NONBLOCK as usize,
+    }
+}
+
+pub struct Map {
+    ptr: *mut u8,
+    length: usize,
+}
+
+impl Deref for Map {
+    type Target = [u8];
+    #[inline]
+    fn deref(&self) -> &[u8] { unsafe { slice::from_raw_parts(self.ptr, self.length) } }
+}
+
+impl DerefMut for Map {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.ptr, self.length) }
+    }
+}
+
+impl Drop for Map {
+    #[inline]
+    fn drop(&mut self) {
+        unsafe { syscall!(MUNMAP, self.ptr, self.length) };
+    }
+}
+
+bitflags! {
+    pub flags Prot: usize {
+        const PROT_EXEC  = libc::PROT_EXEC  as usize,
+        const PROT_READ  = libc::PROT_READ  as usize,
+        const PROT_WRITE = libc::PROT_WRITE as usize,
     }
 }
