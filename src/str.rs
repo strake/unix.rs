@@ -33,9 +33,9 @@ impl OsStr {
 
 impl Deref for OsStr {
     type Target = [u8];
-    fn deref(&self) -> &[u8] { &self.0[0..self.0.len()-1] }
+    #[inline] fn deref(&self) -> &[u8] { &self.0[0..self.0.len()-1] }
 }
 
 impl DerefMut for OsStr {
-    fn deref_mut(&mut self) -> &mut [u8] { let l = self.0.len(); &mut self.0[0..l-1] }
+    #[inline] fn deref_mut(&mut self) -> &mut [u8] { let l = self.0.len(); &mut self.0[0..l-1] }
 }
