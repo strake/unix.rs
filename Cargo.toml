@@ -8,6 +8,6 @@ documentation = "https://docs.rs/unix/"
 
 [dependencies]
 bitflags = "0.7"
+i-o = "0.2"
 libc = "0.2"
-libreal = "0.12"
 syscall = "0.2"

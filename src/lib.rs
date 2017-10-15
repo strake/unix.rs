@@ -6,8 +6,8 @@
 extern crate bitflags;
 #[macro_use]
 extern crate syscall;
+extern crate io;
 extern crate libc;
-extern crate libreal;
 extern crate rand;
 
 pub mod args;

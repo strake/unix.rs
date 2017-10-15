@@ -3,7 +3,7 @@ use core::ops::*;
 use core::ptr;
 use core::slice;
 use libc;
-use libreal::io::*;
+use io::*;
 use rand::*;
 
 pub use libc::stat as Stat;
