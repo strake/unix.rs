@@ -8,14 +8,22 @@ pub struct OsStr([u8]);
 impl OsStr {
     #[inline]
     pub fn from_bytes(bs: &[u8]) -> &Self {
-        if Some(&0) != bs.last() { panic!("argument not null-terminated") };
-        unsafe { mem::transmute(bs) }
+        Self::try_from_bytes(bs).expect("argument not null-terminated")
     }
 
     #[inline]
     pub fn from_mut_bytes(bs: &mut [u8]) -> &mut Self {
-        if Some(&0) != bs.last() { panic!("argument not null-terminated") };
-        unsafe { mem::transmute(bs) }
+        Self::try_from_mut_bytes(bs).expect("argument not null-terminated")
+    }
+
+    #[inline]
+    pub fn try_from_bytes(bs: &[u8]) -> Option<&Self> {
+        if Some(&0) != bs.last() { None } else { Some(unsafe { mem::transmute(bs) }) }
+    }
+
+    #[inline]
+    pub fn try_from_mut_bytes(bs: &mut [u8]) -> Option<&mut Self> {
+        if Some(&0) != bs.last() { None } else { Some(unsafe { mem::transmute(bs) }) }
     }
 
     #[inline]
