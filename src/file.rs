@@ -42,6 +42,9 @@ impl File {
         if ((l as usize) as libc::off_t) != l { Err(OsErr::from(libc::EOVERFLOW as usize)) }
         else { self.map(loc, prot, 0, l as usize) }
     }
+
+    #[inline]
+    pub fn fd(&self) -> isize { self.fd }
 }
 
 #[inline]
