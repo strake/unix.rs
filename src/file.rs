@@ -4,11 +4,13 @@ use core::ptr;
 use core::slice;
 use libc;
 use io::*;
+use isaac::Rng;
 use rand::*;
 
 pub use libc::stat as Stat;
 
 use err::*;
+use random::*;
 use str::*;
 
 use self::OpenMode::*;
@@ -88,8 +90,8 @@ fn from_opt_dir(opt_dir: Option<&File>) -> isize {
 }
 
 #[inline]
-pub fn mktemp_at<R: Clone, TheRng: Rng>
-  (opt_dir: Option<&File>, templ: &mut OsStr, range: R, rng: &mut TheRng, flags: OpenFlags) ->
+pub fn mktemp_at<R: Clone, Rng: RandomGen>
+  (opt_dir: Option<&File>, templ: &mut OsStr, range: R, rng: &mut Rng, flags: OpenFlags) ->
   Result<File, OsErr> where [u8]: IndexMut<R, Output = [u8]> {
     const EEXIST: usize = libc::EEXIST as usize;
 
@@ -106,7 +108,7 @@ pub fn mktemp_at<R: Clone, TheRng: Rng>
 }
 
 #[inline]
-fn randname<TheRng: Rng>(rng: &mut TheRng, bs: &mut [u8]) {
+fn randname<Rng: RandomGen>(rng: &mut Rng, bs: &mut [u8]) {
     let base = 'Z' as u64 - '@' as u64;
     let mut n: u64 = rng.gen();
     for p in bs.iter_mut() {
@@ -118,12 +120,7 @@ fn randname<TheRng: Rng>(rng: &mut TheRng, bs: &mut [u8]) {
 #[inline]
 pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
   (opt_dir: Option<&File>, path: &OsStr, overwrite: bool, writer: F) -> Result<T, OsErr> {
-    let mut rng = {
-        let mut seed = 0u64;
-        try!(get_entropy(unsafe { slice::from_raw_parts_mut(&mut seed as *mut _ as *mut u8,
-                                                            mem::size_of_val(&seed)) }));
-        Isaac64Rng::from_seed(&[seed])
-    };
+    let mut rng: Rng = OsRandom::new().gen();
 
     let mut temp_path = [0; 13];
     let temp_path_ref = OsStr::from_mut_bytes(&mut temp_path);
@@ -136,12 +133,6 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
         let _ = unlink_at(opt_dir, temp_path_ref);
     }
     Ok(m)
-}
-
-#[inline]
-fn get_entropy(bs: &mut [u8]) -> Result<(), OsErr> {
-    try!(open_at(None, OsStr::from_bytes(b"/dev/urandom\0"), RdOnly, OpenFlags::empty(),
-                 FileMode::empty())).read_full(bs).map_err(|(e, _)| e)
 }
 
 impl Drop for File {

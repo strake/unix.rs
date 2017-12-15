@@ -9,5 +9,7 @@ documentation = "https://docs.rs/unix/"
 [dependencies]
 bitflags = "0.7"
 i-o = "0.2"
+isaac = "0.1"
 libc = { version = "0.2", default-features = false }
+rm = "0.3.2"
 syscall = "0.2"
