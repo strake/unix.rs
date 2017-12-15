@@ -24,8 +24,7 @@ impl File {
     #[inline]
     pub fn stat(&self) -> Result<Stat, OsErr> {
         let mut st = unsafe { mem::uninitialized() };
-        OsErr::from_sysret(unsafe { syscall!(FSTAT, self.fd, &mut st as *mut libc::stat) }
-                           as isize).map(|_| st)
+        unsafe { esyscall!(FSTAT, self.fd, &mut st as *mut libc::stat) }.map(|_| st)
     }
 
     #[inline]
@@ -53,33 +52,28 @@ impl File {
 #[inline]
 pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode, flags: OpenFlags,
                f_mode: FileMode) -> Result<File, OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(),
-                                         flags.bits | o_mode.to_usize(), f_mode.to_usize()) }
-                       as isize).map(|fd| File { fd: fd as isize })
+    unsafe { esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(),
+                       flags.bits | o_mode.to_usize(), f_mode.to_usize()) }
+        .map(|fd| File { fd: fd as isize })
 }
 
 #[inline]
 pub fn rename_at(opt_old_dir: Option<&File>, old_path: &OsStr,
                  opt_new_dir: Option<&File>, new_path: &OsStr) -> Result<(), OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(RENAMEAT,
-                                         from_opt_dir(opt_old_dir), old_path.as_ptr(),
-                                         from_opt_dir(opt_new_dir), new_path.as_ptr()) }
-                       as isize).map(|_| ())
+    unsafe { esyscall_!(RENAMEAT, from_opt_dir(opt_old_dir), old_path.as_ptr(),
+                                  from_opt_dir(opt_new_dir), new_path.as_ptr()) }
 }
 
 #[inline]
 pub fn link_at(opt_old_dir: Option<&File>, old_path: &OsStr,
                opt_new_dir: Option<&File>, new_path: &OsStr) -> Result<(), OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(LINKAT,
-                                         from_opt_dir(opt_old_dir), old_path.as_ptr(),
-                                         from_opt_dir(opt_new_dir), new_path.as_ptr()) }
-                       as isize).map(|_| ())
+    unsafe { esyscall_!(LINKAT, from_opt_dir(opt_old_dir), old_path.as_ptr(),
+                                from_opt_dir(opt_new_dir), new_path.as_ptr()) }
 }
 
 #[inline]
 pub fn unlink_at(opt_dir: Option<&File>, path: &OsStr) -> Result<(), OsErr> {
-    OsErr::from_sysret(unsafe { syscall!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr()) }
-                       as isize).map(|_| ())
+    unsafe { esyscall_!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr()) }
 }
 
 #[inline]
@@ -146,8 +140,7 @@ impl Read<u8> for File {
 
     #[inline]
     fn readv(&mut self, bufs: &mut [&mut [u8]]) -> Result<usize, Self::Err> {
-        OsErr::from_sysret(unsafe { syscall!(READV, self.fd, bufs.as_mut_ptr(), bufs.len()) }
-                           as isize)
+        unsafe { esyscall!(READV, self.fd, bufs.as_mut_ptr(), bufs.len()) }
     }
 }
 
@@ -156,13 +149,12 @@ impl Write<u8> for File {
 
     #[inline]
     fn writev(&mut self, bufs: &[&[u8]]) -> Result<usize, Self::Err> {
-        OsErr::from_sysret(unsafe { syscall!(WRITEV, self.fd, bufs.as_ptr(), bufs.len()) }
-                           as isize)
+        unsafe { esyscall!(WRITEV, self.fd, bufs.as_ptr(), bufs.len()) }
     }
 
     #[inline]
     fn flush(&mut self) -> Result<(), Self::Err> {
-        OsErr::from_sysret(unsafe { syscall!(FSYNC, self.fd) } as isize).map(|_| ())
+        unsafe { esyscall_!(FSYNC, self.fd) }
     }
 }
 

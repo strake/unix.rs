@@ -25,3 +25,9 @@ impl From<EndOfFile> for OsErr {
 impl From<NoMemory> for OsErr {
     #[inline] fn from(_: NoMemory) -> Self { Unknown(libc::ENOMEM as usize) }
 }
+
+macro_rules! esyscall {
+    ($n:ident $(, $a:expr)*) => (::err::OsErr::from_sysret(syscall!($n $(, $a)*) as isize))
+}
+
+macro_rules! esyscall_ { ($n:ident $(, $a:expr)*) => (esyscall!($n $(, $a)*).map(|_| ())) }
