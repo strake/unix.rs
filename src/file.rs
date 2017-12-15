@@ -1,3 +1,4 @@
+use core::fmt;
 use core::mem;
 use core::ops::*;
 use core::ptr;
@@ -162,6 +163,13 @@ impl Write<u8> for File {
     #[inline]
     fn flush(&mut self) -> Result<(), Self::Err> {
         OsErr::from_sysret(unsafe { syscall!(FSYNC, self.fd) } as isize).map(|_| ())
+    }
+}
+
+impl fmt::Write for File {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_all(s.as_bytes()).map_err(|_| fmt::Error)
     }
 }
 
