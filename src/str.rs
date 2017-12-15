@@ -37,6 +37,9 @@ impl OsStr {
         while 0 != *ptr.offset(i) { i += 1 };
         mem::transmute(slice::from_raw_parts_mut(ptr, (i as usize)+1))
     }
+
+    #[inline]
+    pub fn as_ptr(&self) -> *const u8 { &self[0] }
 }
 
 impl Deref for OsStr {
