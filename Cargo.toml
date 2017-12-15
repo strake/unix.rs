@@ -8,8 +8,10 @@ documentation = "https://docs.rs/unix/"
 
 [dependencies]
 bitflags = "0.7"
+fallible = "0.1"
 i-o = "0.2"
 isaac = "0.1"
 libc = { version = "0.2", default-features = false }
+null-terminated = "0.2.1"
 rm = "0.3.2"
 syscall = "0.2"

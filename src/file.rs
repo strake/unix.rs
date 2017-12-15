@@ -2,6 +2,7 @@ use core::mem;
 use core::ops::*;
 use core::ptr;
 use core::slice;
+use fallible::*;
 use libc;
 use io::*;
 use isaac::Rng;
@@ -123,7 +124,7 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
     let mut rng: Rng = OsRandom::new().gen();
 
     let mut temp_path = [0; 13];
-    let temp_path_ref = OsStr::from_mut_bytes(&mut temp_path);
+    let temp_path_ref = <&mut OsStr>::try_from(&mut temp_path[..]).unwrap();
     let f = try!(mktemp_at(opt_dir, temp_path_ref, 0..12, &mut rng, OpenFlags::empty()));
     let m = try!(writer(f));
     if overwrite {
