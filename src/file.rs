@@ -33,6 +33,12 @@ impl File {
     } }
 
     #[inline]
+    pub fn sync(&self, metadata: bool) -> Result<(), OsErr> {
+        unsafe { if !metadata { esyscall_!(FDATASYNC, self.fd) }
+                 else         { esyscall_!(FSYNC,     self.fd) } }
+    }
+
+    #[inline]
     pub fn map(&self, loc: Option<*mut u8>, prot: Prot, offset: u64, length: usize) ->
       Result<Map, OsErr> {
         let ptr = unsafe { syscall!(MMAP, loc.unwrap_or(ptr::null_mut()), length, prot.bits,
