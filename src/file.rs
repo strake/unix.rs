@@ -149,20 +149,40 @@ fn randname<Rng: RandomGen>(rng: &mut Rng, bs: &mut [u8]) {
     }
 }
 
+pub enum Clobber {
+    NoClobber,
+    Clobber,
+    ClobberSavingPerms,
+}
+
+pub use self::Clobber::*;
+
 #[inline]
 pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
-  (opt_dir: Option<&File>, path: &OsStr, overwrite: bool, writer: F) -> Result<T, OsErr> {
+  (opt_dir: Option<&File>, path: &OsStr,
+   clobber: Clobber, mode: FileMode, writer: F) -> Result<T, OsErr> {
     let mut rng: Rng = OsRandom::new().gen();
 
     let mut temp_path = [0; 13];
     let temp_path_ref = <&mut OsStr>::try_from(&mut temp_path[..]).unwrap();
     let f = try!(mktemp_at(opt_dir, temp_path_ref, 0..12, &mut rng, OpenFlags::empty()));
+    try!(f.chmod(match clobber {
+        NoClobber | Clobber => mode,
+        ClobberSavingPerms => match stat_at(opt_dir, path, AtFlags::empty()) {
+            Ok(st) => st.mode,
+            Err(OsErr::Unknown(c)) if libc::ENOENT == c as _ => mode,
+            Err(e) => return Err(e),
+        },
+    }));
+
     let m = try!(writer(f));
-    if overwrite {
-        try!(rename_at(opt_dir, temp_path_ref, opt_dir, path));
-    } else {
-        try!(link_at(opt_dir, temp_path_ref, opt_dir, path, AtFlags::empty()));
-        let _ = unlink_at(opt_dir, temp_path_ref);
+
+    match clobber {
+        NoClobber => {
+            try!(link_at(opt_dir, temp_path_ref, opt_dir, path, AtFlags::empty()));
+            let _ = unlink_at(opt_dir, temp_path_ref);
+        },
+        Clobber | ClobberSavingPerms => try!(rename_at(opt_dir, temp_path_ref, opt_dir, path)),
     }
     Ok(m)
 }
