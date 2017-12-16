@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/unix/"
 
 [dependencies]
-bitflags = "0.7"
+bitflags = "1.0"
 fallible = "0.1"
 i-o = "0.2"
 isaac = "0.1"

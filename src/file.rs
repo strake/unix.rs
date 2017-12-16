@@ -53,7 +53,7 @@ impl File {
 pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode, flags: OpenFlags,
                f_mode: FileMode) -> Result<File, OsErr> {
     unsafe { esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(),
-                       flags.bits | o_mode.to_usize(), f_mode.to_usize()) }
+                       flags.bits | o_mode.to_usize(), f_mode.bits) }
         .map(|fd| File { fd: fd as isize })
 }
 
@@ -93,8 +93,7 @@ pub fn mktemp_at<R: Clone, Rng: RandomGen>
     let tries = 0x100;
     for _ in 0..tries {
         randname(rng, &mut templ[range.clone()]);
-        match open_at(opt_dir, templ, RdWr, flags | O_CREAT | O_EXCL,
-                      { let mut f_m = FileMode::empty(); f_m.usr = S_IR; f_m }) {
+        match open_at(opt_dir, templ, RdWr, flags | O_CREAT | O_EXCL, Perm::Read << USR) {
             Err(OsErr::Unknown(EEXIST)) => (),
             r_f => return r_f,
         }
@@ -158,58 +157,48 @@ impl Write<u8> for File {
     }
 }
 
-pub struct FileMode {
-    pub usr: FilePermission,
-    pub grp: FilePermission,
-    pub oth: FilePermission,
-    pub suid: bool,
-    pub sgid: bool,
-    pub svtx: bool,
-}
-
-impl FileMode {
-    #[inline] pub fn empty() -> Self {
-        FileMode {
-            usr: FilePermission::empty(),
-            grp: FilePermission::empty(),
-            oth: FilePermission::empty(),
-            suid: false,
-            sgid: false,
-            svtx: false,
-        }
-    }
-
-    #[inline] fn to_usize(self) -> usize {
-        (self.suid as usize) << 11 |
-        (self.sgid as usize) << 10 |
-        (self.svtx as usize) << 09 |
-        (self.usr.bits as usize) << 6 |
-        (self.grp.bits as usize) << 3 |
-        (self.oth.bits as usize) << 0 |
-        0
-    }
-}
-
-impl BitOr for FileMode {
-    type Output = Self;
-    fn bitor(self, other: Self) -> Self {
-        FileMode {
-            usr: self.usr | other.usr,
-            grp: self.grp | other.grp,
-            oth: self.oth | other.oth,
-            suid: self.suid | other.suid,
-            sgid: self.sgid | other.sgid,
-            svtx: self.svtx | other.svtx,
-        }
+bitflags! {
+    pub struct FileMode: u16 {
+        const SUID = 0o4000;
+        const SGID = 0o2000;
+        const SVTX = 0o1000;
+        #[doc(hidden)]
+        const ____ = 0o0777;
     }
 }
 
 bitflags! {
-    pub flags FilePermission: u8 {
-        const S_IR = 4,
-        const S_IW = 2,
-        const S_IX = 1,
+    pub struct FilePermission: u8 {
+        const Read  = 4;
+        const Write = 2;
+        const Exec  = 1;
     }
+}
+use self::FilePermission as Perm;
+
+impl Shl<FileModeSection> for FilePermission {
+    type Output = FileMode;
+    #[inline]
+    fn shl(self, sect: FileModeSection) -> FileMode {
+        FileMode::from_bits_truncate((self.bits as u16) << sect.pos())
+    }
+}
+
+impl Shr<FileModeSection> for FileMode {
+    type Output = FilePermission;
+    #[inline]
+    fn shr(self, sect: FileModeSection) -> FilePermission {
+        FilePermission::from_bits_truncate((self.bits >> sect.pos() & 3) as _)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum FileModeSection { USR, GRP, OTH }
+pub use self::FileModeSection::*;
+
+impl FileModeSection {
+    #[inline]
+    fn pos(self) -> u32 { match self { USR => 6, GRP => 3, OTH => 0 } }
 }
 
 pub enum OpenMode {
@@ -229,13 +218,17 @@ impl OpenMode {
 }
 
 bitflags! {
-    pub flags OpenFlags: usize {
-        const O_CLOEXEC  = libc::O_CLOEXEC  as usize,
-        const O_CREAT    = libc::O_CREAT    as usize,
-        const O_EXCL     = libc::O_EXCL     as usize,
-        const O_NONBLOCK = libc::O_NONBLOCK as usize,
+    pub struct OpenFlags: usize {
+        const O_CLOEXEC  = libc::O_CLOEXEC  as usize;
+        const O_CREAT    = libc::O_CREAT    as usize;
+        const O_EXCL     = libc::O_EXCL     as usize;
+        const O_NONBLOCK = libc::O_NONBLOCK as usize;
     }
 }
+pub const O_CLOEXEC : OpenFlags = OpenFlags::O_CLOEXEC;
+pub const O_CREAT   : OpenFlags = OpenFlags::O_CREAT;
+pub const O_EXCL    : OpenFlags = OpenFlags::O_EXCL;
+pub const O_NONBLOCK: OpenFlags = OpenFlags::O_NONBLOCK;
 
 pub struct Map {
     ptr: *mut u8,
@@ -263,9 +256,9 @@ impl Drop for Map {
 }
 
 bitflags! {
-    pub flags Prot: usize {
-        const PROT_EXEC  = libc::PROT_EXEC  as usize,
-        const PROT_READ  = libc::PROT_READ  as usize,
-        const PROT_WRITE = libc::PROT_WRITE as usize,
+    pub struct Prot: usize {
+        const PROT_EXEC  = libc::PROT_EXEC  as usize;
+        const PROT_READ  = libc::PROT_READ  as usize;
+        const PROT_WRITE = libc::PROT_WRITE as usize;
     }
 }
