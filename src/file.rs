@@ -157,6 +157,7 @@ pub enum Clobber {
 
 pub use self::Clobber::*;
 
+#[cfg(not(target_os = "linux"))]
 #[inline]
 pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
   (opt_dir: Option<&File>, path: &OsStr,
@@ -185,6 +186,21 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
         Clobber | ClobberSavingPerms => try!(rename_at(opt_dir, temp_path_ref, opt_dir, path)),
     }
     Ok(m)
+}
+
+#[cfg(target_os = "linux")]
+#[inline]
+pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
+  (opt_dir: Option<&File>, path: &OsStr,
+   clobber: Clobber, mode: FileMode, writer: F) -> Result<T, OsErr> {
+    let f = try!(open_at(opt_dir, OsStr::from_bytes(b".\0"), RdWr, O_TMPFILE, mode));
+    if let ClobberSavingPerms = clobber { match stat_at(opt_dir, path, AT_SYMLINK_NOFOLLOW) {
+        Ok(st) => try!(f.chmod(st.mode)),
+        Err(OsErr::Unknown(libc::ENOENT)) => (),
+        Err(e) => return Err(e),
+    } };
+    try!(f.sync(true));
+    try!(link_at(f.fd, "", opt_dir, path));
 }
 
 impl Drop for File {
@@ -281,12 +297,16 @@ bitflags! {
         const O_CREAT    = libc::O_CREAT    as usize;
         const O_EXCL     = libc::O_EXCL     as usize;
         const O_NONBLOCK = libc::O_NONBLOCK as usize;
+        #[cfg(target_os = "linux")]
+        const O_TMPFILE  = libc::O_TMPFILE  as usize;
     }
 }
 pub const O_CLOEXEC : OpenFlags = OpenFlags::O_CLOEXEC;
 pub const O_CREAT   : OpenFlags = OpenFlags::O_CREAT;
 pub const O_EXCL    : OpenFlags = OpenFlags::O_EXCL;
 pub const O_NONBLOCK: OpenFlags = OpenFlags::O_NONBLOCK;
+#[cfg(target_os = "linux")]
+pub const O_TMPFILE : OpenFlags = OpenFlags::O_TMPFILE;
 
 bitflags! {
     pub struct AtFlags: usize {
