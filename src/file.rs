@@ -8,11 +8,10 @@ use io::*;
 use isaac::Rng;
 use rand::*;
 
-pub use libc::stat as Stat;
-
 use err::*;
 use random::*;
 use str::*;
+use time::*;
 
 use self::OpenMode::*;
 
@@ -22,10 +21,12 @@ pub struct File {
 
 impl File {
     #[inline]
-    pub fn stat(&self) -> Result<Stat, OsErr> {
-        let mut st = unsafe { mem::uninitialized() };
-        unsafe { esyscall!(FSTAT, self.fd, &mut st as *mut libc::stat) }.map(|_| st)
-    }
+    #[inline]
+    pub fn stat(&self) -> Result<Stat, OsErr> { unsafe {
+        let mut st: libc::stat = mem::uninitialized();
+        try!(esyscall!(FSTAT, self.fd, &mut st as *mut _));
+        Ok(Stat::from(st))
+    } }
 
     #[inline]
     pub fn map(&self, loc: Option<*mut u8>, prot: Prot, offset: u64, length: usize) ->
@@ -40,7 +41,7 @@ impl File {
 
     #[inline]
     pub fn map_full(&self, loc: Option<*mut u8>, prot: Prot) -> Result<Map, OsErr> {
-        let l = try!(self.stat()).st_size;
+        let l = try!(self.stat()).size;
         if ((l as usize) as libc::off_t) != l { Err(OsErr::from(libc::EOVERFLOW as usize)) }
         else { self.map(loc, prot, 0, l as usize) }
     }
@@ -75,6 +76,19 @@ pub fn link_at(opt_old_dir: Option<&File>, old_path: &OsStr,
 pub fn unlink_at(opt_dir: Option<&File>, path: &OsStr) -> Result<(), OsErr> {
     unsafe { esyscall_!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr()) }
 }
+
+#[inline]
+pub fn stat_at(opt_dir: Option<&File>, path: &OsStr) -> Result<Stat, OsErr> { unsafe {
+    let fd = from_opt_dir(opt_dir);
+    let mut st: libc::stat = mem::uninitialized();
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    try!(esyscall_!(NEWFSTATAT, fd, path.as_ptr(), &mut st as *mut _, 0));
+    #[cfg(all(target_os = "linux", not(target_arch = "x86_64")))]
+    try!(esyscall_!(FSTATAT64,  fd, path.as_ptr(), &mut st as *mut _, 0));
+    #[cfg(not(target_os = "linux"))]
+    try!(esyscall_!(FSTATAT,    fd, path.as_ptr(), &mut st as *mut _, 0));
+    Ok(Stat::from(st))
+} }
 
 #[inline]
 fn from_opt_dir(opt_dir: Option<&File>) -> isize {
@@ -260,5 +274,40 @@ bitflags! {
         const PROT_EXEC  = libc::PROT_EXEC  as usize;
         const PROT_READ  = libc::PROT_READ  as usize;
         const PROT_WRITE = libc::PROT_WRITE as usize;
+    }
+}
+
+pub struct Stat {
+    pub dev:     libc::dev_t,
+    pub ino:     libc::ino_t,
+    pub mode:    FileMode,
+    pub nlink:   libc::nlink_t,
+    pub uid:     libc::uid_t,
+    pub gid:     libc::gid_t,
+    pub size:    libc::off_t,
+    pub blksize: libc::blksize_t,
+    pub blocks:  libc::blkcnt_t,
+    pub atime:   EpochTime,
+    pub mtime:   EpochTime,
+    pub ctime:   EpochTime,
+}
+
+impl From<libc::stat> for Stat {
+    #[inline(always)]
+    fn from(st: libc::stat) -> Self {
+        Stat {
+            dev: st.st_dev,
+            ino: st.st_ino,
+            mode: FileMode::from_bits_truncate(st.st_mode as _),
+            nlink: st.st_nlink,
+            uid: st.st_uid,
+            gid: st.st_gid,
+            size: st.st_size,
+            blksize: st.st_blksize,
+            blocks: st.st_blocks,
+            atime: EpochTime::from_s_ns(st.st_atime, st.st_atime_nsec),
+            mtime: EpochTime::from_s_ns(st.st_mtime, st.st_mtime_nsec),
+            ctime: EpochTime::from_s_ns(st.st_ctime, st.st_ctime_nsec),
+        }
     }
 }
