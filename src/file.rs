@@ -67,9 +67,12 @@ pub fn rename_at(opt_old_dir: Option<&File>, old_path: &OsStr,
 
 #[inline]
 pub fn link_at(opt_old_dir: Option<&File>, old_path: &OsStr,
-               opt_new_dir: Option<&File>, new_path: &OsStr) -> Result<(), OsErr> {
+               opt_new_dir: Option<&File>, new_path: &OsStr,
+               at_flags: AtFlags) -> Result<(), OsErr> {
     unsafe { esyscall_!(LINKAT, from_opt_dir(opt_old_dir), old_path.as_ptr(),
-                                from_opt_dir(opt_new_dir), new_path.as_ptr()) }
+                                from_opt_dir(opt_new_dir), new_path.as_ptr(),
+                        if at_flags.contains(AtFlags::Follow) { ::libc::AT_SYMLINK_FOLLOW }
+                        else { 0 } | AT_EMPTY_PATH) }
 }
 
 #[inline]
@@ -78,15 +81,18 @@ pub fn unlink_at(opt_dir: Option<&File>, path: &OsStr) -> Result<(), OsErr> {
 }
 
 #[inline]
-pub fn stat_at(opt_dir: Option<&File>, path: &OsStr) -> Result<Stat, OsErr> { unsafe {
+pub fn stat_at(opt_dir: Option<&File>, path: &OsStr,
+               at_flags: AtFlags) -> Result<Stat, OsErr> { unsafe {
+    let fl = if at_flags.contains(AtFlags::Follow) { 0 } else { libc::AT_SYMLINK_NOFOLLOW }
+           | AT_EMPTY_PATH;
     let fd = from_opt_dir(opt_dir);
     let mut st: libc::stat = mem::uninitialized();
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    try!(esyscall_!(NEWFSTATAT, fd, path.as_ptr(), &mut st as *mut _, 0));
+    try!(esyscall_!(NEWFSTATAT, fd, path.as_ptr(), &mut st as *mut _, fl));
     #[cfg(all(target_os = "linux", not(target_arch = "x86_64")))]
-    try!(esyscall_!(FSTATAT64,  fd, path.as_ptr(), &mut st as *mut _, 0));
+    try!(esyscall_!(FSTATAT64,  fd, path.as_ptr(), &mut st as *mut _, fl));
     #[cfg(not(target_os = "linux"))]
-    try!(esyscall_!(FSTATAT,    fd, path.as_ptr(), &mut st as *mut _, 0));
+    try!(esyscall_!(FSTATAT,    fd, path.as_ptr(), &mut st as *mut _, fl));
     Ok(Stat::from(st))
 } }
 
@@ -137,7 +143,7 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
     if overwrite {
         try!(rename_at(opt_dir, temp_path_ref, opt_dir, path));
     } else {
-        try!(link_at(opt_dir, temp_path_ref, opt_dir, path));
+        try!(link_at(opt_dir, temp_path_ref, opt_dir, path, AtFlags::empty()));
         let _ = unlink_at(opt_dir, temp_path_ref);
     }
     Ok(m)
@@ -244,6 +250,12 @@ pub const O_CREAT   : OpenFlags = OpenFlags::O_CREAT;
 pub const O_EXCL    : OpenFlags = OpenFlags::O_EXCL;
 pub const O_NONBLOCK: OpenFlags = OpenFlags::O_NONBLOCK;
 
+bitflags! {
+    pub struct AtFlags: usize {
+        const Follow = libc::AT_SYMLINK_FOLLOW as usize;
+    }
+}
+
 pub struct Map {
     ptr: *mut u8,
     length: usize,
@@ -311,3 +323,8 @@ impl From<libc::stat> for Stat {
         }
     }
 }
+
+#[cfg(target_os = "linux")]
+const AT_EMPTY_PATH: libc::c_int = libc::AT_EMPTY_PATH;
+#[cfg(not(target_os = "linux"))]
+const AT_EMPTY_PATH: libc::c_int = 0;
