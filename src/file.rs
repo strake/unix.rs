@@ -21,6 +21,10 @@ pub struct File {
 
 impl File {
     #[inline]
+    pub fn chmod(&self, mode: FileMode) -> Result<(), OsErr> {
+        unsafe { esyscall_!(FCHMOD, self.fd, mode.bits) }
+    }
+
     #[inline]
     pub fn stat(&self) -> Result<Stat, OsErr> { unsafe {
         let mut st: libc::stat = mem::uninitialized();
@@ -78,6 +82,14 @@ pub fn link_at(opt_old_dir: Option<&File>, old_path: &OsStr,
 #[inline]
 pub fn unlink_at(opt_dir: Option<&File>, path: &OsStr) -> Result<(), OsErr> {
     unsafe { esyscall_!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr()) }
+}
+
+#[inline]
+pub fn chmod_at(opt_dir: Option<&File>, path: &OsStr,
+                mode: FileMode, at_flags: AtFlags) -> Result<(), OsErr> {
+    unsafe { esyscall_!(FCHMODAT, from_opt_dir(opt_dir), path.as_ptr(), mode.bits,
+                        if at_flags.contains(AtFlags::Follow) { 0 }
+                        else { libc::AT_SYMLINK_NOFOLLOW }) }
 }
 
 #[inline]
