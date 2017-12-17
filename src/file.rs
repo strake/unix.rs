@@ -1,12 +1,15 @@
+use core::intrinsics::unreachable as unreach;
 use core::mem;
 use core::ops::*;
 use core::ptr;
 use core::slice;
 use fallible::*;
 use libc;
+use null_terminated::Nul;
 use io::*;
 use isaac::Rng;
 use rand::*;
+use void::Void;
 
 use err::*;
 use random::*;
@@ -54,6 +57,18 @@ impl File {
         let l = try!(self.stat()).size;
         if ((l as usize) as libc::off_t) != l { Err(OsErr::from(libc::EOVERFLOW as usize)) }
         else { self.map(loc, prot, 0, l as usize) }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[inline]
+    pub fn exec(&self, argv: &Nul<&OsStr>, envp: &Nul<&OsStr>) -> Result<Void, OsErr> {
+        exec_at(Some(self), str0!(""), argv, envp, AtFlags::Follow)
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    #[inline]
+    pub fn exec(&self, argv: &Nul<&OsStr>, envp: &Nul<&OsStr>) -> Result<Void, OsErr> {
+        unsafe { esyscall!(FEXECVE, self.fd, argv, envp).map(|_| unreach()) }
     }
 
     #[inline]
@@ -123,6 +138,16 @@ pub fn stat_at(opt_dir: Option<&File>, path: &OsStr,
     try!(esyscall_!(FSTATAT,    fd, path.as_ptr(), &mut st as *mut _, fl));
     Ok(Stat::from(st))
 } }
+
+#[cfg(target_os = "linux")]
+#[inline]
+pub fn exec_at(opt_dir: Option<&File>, path: &OsStr,
+               argv: &Nul<&OsStr>, env: &Nul<&OsStr>, at_flags: AtFlags) -> Result<Void, OsErr> {
+    unsafe { esyscall!(EXECVEAT, from_opt_dir(opt_dir), path.as_ptr(),
+                       argv.as_ptr(), env.as_ptr(),
+                       if at_flags.contains(AtFlags::Follow) { 0 }
+                       else { libc::AT_SYMLINK_NOFOLLOW } | AT_EMPTY_PATH).map(|_| unreach()) }
+}
 
 #[inline]
 fn from_opt_dir(opt_dir: Option<&File>) -> isize {
