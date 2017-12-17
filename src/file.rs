@@ -71,6 +71,13 @@ impl File {
 }
 
 #[inline]
+pub fn mk_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { unsafe {
+    let mut fds: [::libc::c_int; 2] = mem::uninitialized();
+    try!(esyscall!(PIPE2, &mut fds as *mut _, flags.bits));
+    Ok((File { fd: fds[0] as _ }, File { fd: fds[1] as _ }))
+} }
+
+#[inline]
 pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode, flags: OpenFlags,
                f_mode: FileMode) -> Result<File, OsErr> {
     unsafe { esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(),
