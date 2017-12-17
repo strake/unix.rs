@@ -18,6 +18,7 @@ extern crate time as tempus;
 #[macro_use]
 pub mod err;
 pub mod file;
+pub mod process;
 pub mod str { pub type OsStr = ::null_terminated::Nul<u8>; }
 pub mod time;
 
