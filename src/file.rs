@@ -58,6 +58,16 @@ impl File {
 
     #[inline]
     pub fn fd(&self) -> isize { self.fd }
+
+    #[inline]
+    pub fn new(fd: isize) -> Option<Self> {
+        if unsafe {
+            syscall!(FCNTL, fd, ::libc::F_GETFD) as isize
+        } >= 0 { Some(File { fd: fd }) } else { None }
+    }
+
+    #[inline]
+    pub const fn new_unchecked(fd: isize) -> Self { File { fd: fd } }
 }
 
 #[inline]
@@ -185,6 +195,18 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
         Clobber | ClobberSavingPerms => try!(rename_at(opt_dir, temp_path_ref, opt_dir, path)),
     }
     Ok(m)
+}
+
+impl TryClone for File {
+    type Error = OsErr;
+    #[inline]
+    fn try_clone(&self) -> Result<Self, OsErr> {
+        unsafe { esyscall!(DUP, self.fd) }.map(|fd| File { fd: fd as _ })
+    }
+    #[inline]
+    fn try_clone_from(&mut self, other: &Self) -> Result<(), OsErr> {
+        unsafe { esyscall_!(DUP2, other.fd, self.fd) }
+    }
 }
 
 impl Drop for File {

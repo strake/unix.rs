@@ -1,5 +1,6 @@
 #![no_std]
 
+#![feature(const_fn)]
 #![feature(i128_type)]
 
 #[macro_use]
