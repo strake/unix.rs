@@ -60,6 +60,15 @@ impl File {
     pub fn fd(&self) -> isize { self.fd }
 }
 
+#[cfg(target_os = "linux")]
+#[inline]
+pub fn mk_in_mem(name: &OsStr, flags: OpenFlags) -> Result<File, OsErr> {
+    if !O_CLOEXEC.contains(flags) { return Err(OsErr::from(libc::EINVAL as usize)); }
+    unsafe { esyscall!(MEMFD_CREATE, name.as_ptr(),
+                       if flags.contains(O_CLOEXEC) { libc::MFD_CLOEXEC }
+                       else { 0 }) }.map(|fd| File { fd: fd as _ })
+}
+
 #[inline]
 pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode, flags: OpenFlags,
                f_mode: FileMode) -> Result<File, OsErr> {
