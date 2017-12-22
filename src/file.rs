@@ -43,7 +43,7 @@ impl File {
     }
 
     #[inline]
-    pub fn map(&self, loc: Option<*mut u8>, prot: Prot, seg: Option<Segment>) ->
+    unsafe fn do_map(&self, loc: Option<*mut u8>, prot: Prot, seg: Option<Segment>) ->
       Result<Map, OsErr> {
         let Segment { offset, length } = seg.unwrap_or(Segment { offset: 0, length: {
             let l = try!(self.stat()).size;
@@ -52,13 +52,22 @@ impl File {
             }
             l as _
         } });
-        let ptr = unsafe { syscall!(MMAP, loc.unwrap_or(ptr::null_mut()), length, prot.bits,
-                                    if loc.is_some() { libc::MAP_FIXED } else { 0 }, self.fd,
-                                    offset) } as *mut u8;
+        let ptr = syscall!(MMAP, loc.unwrap_or(ptr::null_mut()), length, prot.bits,
+                           if loc.is_some() { libc::MAP_FIXED } else { 0 }, self.fd,
+                           offset) as *mut u8;
         if (ptr as usize) > 0x1000usize.wrapping_neg() {
             Err(OsErr::from((ptr as usize).wrapping_neg()))
         } else { Ok(Map { ptr: ptr as *mut u8, length: length }) }
     }
+
+    #[inline]
+    pub fn map(&self, prot: Prot, seg: Option<Segment>) -> Result<Map, OsErr> {
+        unsafe { self.do_map(None, prot, seg) }
+    }
+
+    #[inline]
+    pub unsafe fn map_at(&self, loc: *mut u8, prot: Prot, seg: Option<Segment>) ->
+      Result<Map, OsErr> { self.do_map(Some(loc), prot, seg) }
 
     #[cfg(target_os = "linux")]
     #[inline]
