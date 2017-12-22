@@ -206,7 +206,8 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
    clobber: Clobber, mode: FileMode, writer: F) -> Result<T, OsErr> {
     let mut rng: Rng = OsRandom::new().gen();
 
-    let mut temp_path = [0; 13];
+    let mut temp_path = [b' '; 13];
+    { let l = temp_path.len(); temp_path[l - 1] = 0; }
     let temp_path_ref = <&mut OsStr>::try_from(&mut temp_path[..]).unwrap();
     let f = try!(mktemp_at(opt_dir, temp_path_ref, 0..12, &mut rng, OpenFlags::empty()));
     try!(f.chmod(match clobber {
