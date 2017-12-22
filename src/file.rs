@@ -266,9 +266,7 @@ impl Write<u8> for File {
     }
 
     #[inline]
-    fn flush(&mut self) -> Result<(), Self::Err> {
-        unsafe { esyscall_!(FSYNC, self.fd) }
-    }
+    fn flush(&mut self) -> Result<(), Self::Err> { self.sync(false) }
 }
 
 impl fmt::Write for File {
