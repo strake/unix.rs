@@ -61,13 +61,13 @@ impl File {
     }
 
     #[inline]
-    pub fn map(&self, prot: Prot, seg: Option<Segment>) -> Result<Map, OsErr> {
-        unsafe { self.do_map(None, prot, seg) }
+    pub fn map(&self, perm: Perm, seg: Option<Segment>) -> Result<Map, OsErr> {
+        unsafe { self.do_map(None, Prot::from(perm), seg) }
     }
 
     #[inline]
-    pub unsafe fn map_at(&self, loc: *mut u8, prot: Prot, seg: Option<Segment>) ->
-      Result<Map, OsErr> { self.do_map(Some(loc), prot, seg) }
+    pub unsafe fn map_at(&self, loc: *mut u8, perm: Perm, seg: Option<Segment>) ->
+      Result<Map, OsErr> { self.do_map(Some(loc), Prot::from(perm), seg) }
 
     #[cfg(target_os = "linux")]
     #[inline]
@@ -393,10 +393,23 @@ impl Drop for Map {
 }
 
 bitflags! {
-    pub struct Prot: usize {
+    struct Prot: usize {
         const PROT_EXEC  = libc::PROT_EXEC  as usize;
         const PROT_READ  = libc::PROT_READ  as usize;
         const PROT_WRITE = libc::PROT_WRITE as usize;
+    }
+}
+
+impl From<Perm> for Prot {
+    #[inline]
+    fn from(perm: Perm) -> Prot {
+        let mut prot = Prot::empty();
+        for &(prt, prm) in &[(Prot::PROT_READ,  Perm::Read),
+                             (Prot::PROT_WRITE, Perm::Write),
+                             (Prot::PROT_EXEC,  Perm::Exec)] {
+            if perm.contains(prm) { prot |= prt; }
+        }
+        prot
     }
 }
 
