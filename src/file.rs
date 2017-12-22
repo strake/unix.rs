@@ -43,21 +43,21 @@ impl File {
     }
 
     #[inline]
-    pub fn map(&self, loc: Option<*mut u8>, prot: Prot, offset: u64, length: usize) ->
+    pub fn map(&self, loc: Option<*mut u8>, prot: Prot, seg: Option<Segment>) ->
       Result<Map, OsErr> {
+        let Segment { offset, length } = seg.unwrap_or(Segment { offset: 0, length: {
+            let l = try!(self.stat()).size;
+            if ((l as usize) as libc::off_t) != l {
+                return Err(OsErr::from(libc::EOVERFLOW as usize));
+            }
+            l as _
+        } });
         let ptr = unsafe { syscall!(MMAP, loc.unwrap_or(ptr::null_mut()), length, prot.bits,
                                     if loc.is_some() { libc::MAP_FIXED } else { 0 }, self.fd,
                                     offset) } as *mut u8;
         if (ptr as usize) > 0x1000usize.wrapping_neg() {
             Err(OsErr::from((ptr as usize).wrapping_neg()))
         } else { Ok(Map { ptr: ptr as *mut u8, length: length }) }
-    }
-
-    #[inline]
-    pub fn map_full(&self, loc: Option<*mut u8>, prot: Prot) -> Result<Map, OsErr> {
-        let l = try!(self.stat()).size;
-        if ((l as usize) as libc::off_t) != l { Err(OsErr::from(libc::EOVERFLOW as usize)) }
-        else { self.map(loc, prot, 0, l as usize) }
     }
 
     #[cfg(target_os = "linux")]
@@ -85,6 +85,9 @@ impl File {
     #[inline]
     pub const fn new_unchecked(fd: isize) -> Self { File { fd: fd } }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Segment { pub offset: u64, pub length: usize }
 
 #[inline]
 pub fn mk_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { unsafe {
