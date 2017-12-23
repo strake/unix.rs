@@ -43,6 +43,11 @@ impl File {
     }
 
     #[inline]
+    pub fn truncate(&self, length: u64) -> Result<(), OsErr> {
+        unsafe { esyscall_!(FTRUNCATE, self.fd, try_to_usize(length)?) }
+    }
+
+    #[inline]
     unsafe fn do_map(&self, loc: Option<*mut u8>, prot: Prot, seg: Option<Segment>) ->
       Result<Map, OsErr> {
         let Segment { offset, length } = seg.unwrap_or(Segment {
