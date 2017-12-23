@@ -45,13 +45,9 @@ impl File {
     #[inline]
     unsafe fn do_map(&self, loc: Option<*mut u8>, prot: Prot, seg: Option<Segment>) ->
       Result<Map, OsErr> {
-        let Segment { offset, length } = seg.unwrap_or(Segment { offset: 0, length: {
-            let l = try!(self.stat()).size;
-            if ((l as usize) as libc::off_t) != l {
-                return Err(OsErr::from(libc::EOVERFLOW as usize));
-            }
-            l as _
-        } });
+        let Segment { offset, length } = seg.unwrap_or(Segment {
+            offset: 0, length: try_to_usize(self.stat()?.size as _)?
+        });
         let ptr = syscall!(MMAP, loc.unwrap_or(ptr::null_mut()), length, prot.bits,
                            if loc.is_some() { libc::MAP_FIXED } else { 0 }, self.fd,
                            offset) as *mut u8;
@@ -452,3 +448,8 @@ impl From<libc::stat> for Stat {
 const AT_EMPTY_PATH: libc::c_int = libc::AT_EMPTY_PATH;
 #[cfg(not(target_os = "linux"))]
 const AT_EMPTY_PATH: libc::c_int = 0;
+
+fn try_to_usize(n: u64) -> Result<usize, OsErr> {
+    let m = n as usize;
+    if m as u64 == n { Ok(m) } else { Err(OsErr::from(libc::EOVERFLOW as usize)) }
+}
