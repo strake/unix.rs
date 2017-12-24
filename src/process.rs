@@ -14,24 +14,24 @@ pub fn quit(code: isize) -> ! { unsafe {
     ::core::intrinsics::abort()
 } }
 
-#[inline]
-pub fn wait(spec: WaitSpec, flags: WaitFlags) -> Result<(WaitInfo, ::libc::rusage), OsErr> {
-    unsafe {
-        let (id_type, id) = spec.to_wait_args();
-        let mut si: siginfo = mem::uninitialized();
-        let mut ru: ::libc::rusage = mem::uninitialized();
-        si.si.pid = 0;
-        try!(esyscall!(WAITID, id_type, id, &mut si as *mut _, flags.bits, &mut ru as *mut _));
-        if 0 == si.si.pid { return Err(OsErr::from(::libc::EWOULDBLOCK as usize)) }
-        Ok((WaitInfo::from_c(si.si), ru))
-    }
-}
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WaitSpec { Pid(Id), Gid(Id), All }
 
 impl WaitSpec {
+    #[inline]
+    pub fn wait(self, flags: WaitFlags) -> Result<(WaitInfo, ::libc::rusage), OsErr> {
+        unsafe {
+            let (id_type, id) = self.to_wait_args();
+            let mut si: siginfo = mem::uninitialized();
+            let mut ru: ::libc::rusage = mem::uninitialized();
+            si.si.pid = 0;
+            esyscall!(WAITID, id_type, id, &mut si as *mut _, flags.bits, &mut ru as *mut _)?;
+            if 0 == si.si.pid { return Err(OsErr::from(::libc::EWOULDBLOCK as usize)) }
+            Ok((WaitInfo::from_c(si.si), ru))
+        }
+    }
+
     #[inline]
     unsafe fn to_wait_args(self) -> (::libc::idtype_t, Id) {
         use self::WaitSpec::*;
