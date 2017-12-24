@@ -1,5 +1,5 @@
 use core::mem;
-use libc::id_t as Id;
+pub use libc::id_t as Id;
 
 use err::*;
 
