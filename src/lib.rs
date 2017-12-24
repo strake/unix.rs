@@ -21,6 +21,7 @@ extern crate void;
 #[macro_use]
 pub mod err;
 pub mod file;
+pub mod poll;
 pub mod process;
 pub mod str { pub type OsStr = ::null_terminated::Nul<u8>; }
 pub mod time;
