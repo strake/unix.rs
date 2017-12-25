@@ -73,11 +73,15 @@ impl File {
 }
 
 #[inline]
-pub fn mk_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { unsafe {
+pub fn new_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { unsafe {
     let mut fds: [::libc::c_int; 2] = mem::uninitialized();
     try!(esyscall!(PIPE2, &mut fds as *mut _, flags.bits));
     Ok((File { fd: fds[0] as _ }, File { fd: fds[1] as _ }))
 } }
+
+#[deprecated(since = "0.3.0", note = "use `new_pipe`")]
+#[inline]
+pub fn mk_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { new_pipe(flags) }
 
 #[inline]
 pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode, flags: OpenFlags,
