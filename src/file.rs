@@ -2,8 +2,6 @@ use core::fmt;
 use core::intrinsics::unreachable as unreach;
 use core::mem;
 use core::ops::*;
-use core::ptr;
-use core::slice;
 use fallible::*;
 use libc;
 use null_terminated::Nul;
@@ -16,6 +14,7 @@ use err::*;
 use random::*;
 use str::*;
 use time::*;
+use util::*;
 
 use self::OpenMode::*;
 
@@ -47,29 +46,6 @@ impl File {
         unsafe { esyscall_!(FTRUNCATE, self.fd, try_to_usize(length)?) }
     }
 
-    #[inline]
-    unsafe fn do_map(&self, loc: Option<*mut u8>, prot: Prot, seg: Option<Segment>) ->
-      Result<Map, OsErr> {
-        let Segment { offset, length } = seg.unwrap_or(Segment {
-            offset: 0, length: try_to_usize(self.stat()?.size as _)?
-        });
-        let ptr = syscall!(MMAP, loc.unwrap_or(ptr::null_mut()), length, prot.bits,
-                           if loc.is_some() { libc::MAP_FIXED } else { 0 }, self.fd,
-                           offset) as *mut u8;
-        if (ptr as usize) > 0x1000usize.wrapping_neg() {
-            Err(OsErr::from((ptr as usize).wrapping_neg()))
-        } else { Ok(Map { ptr: ptr as *mut u8, length: length }) }
-    }
-
-    #[inline]
-    pub fn map(&self, perm: Perm, seg: Option<Segment>) -> Result<Map, OsErr> {
-        unsafe { self.do_map(None, Prot::from(perm), seg) }
-    }
-
-    #[inline]
-    pub unsafe fn map_at(&self, loc: *mut u8, perm: Perm, seg: Option<Segment>) ->
-      Result<Map, OsErr> { self.do_map(Some(loc), Prot::from(perm), seg) }
-
     #[cfg(target_os = "linux")]
     #[inline]
     pub fn exec(&self, argv: &Nul<&OsStr>, envp: &Nul<&OsStr>) -> Result<Void, OsErr> {
@@ -95,9 +71,6 @@ impl File {
     #[inline]
     pub const fn new_unchecked(fd: isize) -> Self { File { fd: fd } }
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Segment { pub offset: u64, pub length: usize }
 
 #[inline]
 pub fn mk_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { unsafe {
@@ -306,7 +279,7 @@ bitflags! {
         const Exec  = 1;
     }
 }
-use self::FilePermission as Perm;
+pub(crate) use self::FilePermission as Perm;
 
 impl Shl<FileModeSection> for FilePermission {
     type Output = FileMode;
@@ -368,52 +341,6 @@ bitflags! {
     }
 }
 
-pub struct Map {
-    ptr: *mut u8,
-    length: usize,
-}
-
-impl Deref for Map {
-    type Target = [u8];
-    #[inline]
-    fn deref(&self) -> &[u8] { unsafe { slice::from_raw_parts(self.ptr, self.length) } }
-}
-
-impl DerefMut for Map {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self.ptr, self.length) }
-    }
-}
-
-impl Drop for Map {
-    #[inline]
-    fn drop(&mut self) {
-        unsafe { syscall!(MUNMAP, self.ptr, self.length) };
-    }
-}
-
-bitflags! {
-    struct Prot: usize {
-        const PROT_EXEC  = libc::PROT_EXEC  as usize;
-        const PROT_READ  = libc::PROT_READ  as usize;
-        const PROT_WRITE = libc::PROT_WRITE as usize;
-    }
-}
-
-impl From<Perm> for Prot {
-    #[inline]
-    fn from(perm: Perm) -> Prot {
-        let mut prot = Prot::empty();
-        for &(prt, prm) in &[(Prot::PROT_READ,  Perm::Read),
-                             (Prot::PROT_WRITE, Perm::Write),
-                             (Prot::PROT_EXEC,  Perm::Exec)] {
-            if perm.contains(prm) { prot |= prt; }
-        }
-        prot
-    }
-}
-
 pub struct Stat {
     pub dev:     libc::dev_t,
     pub ino:     libc::ino_t,
@@ -453,8 +380,3 @@ impl From<libc::stat> for Stat {
 const AT_EMPTY_PATH: libc::c_int = libc::AT_EMPTY_PATH;
 #[cfg(not(target_os = "linux"))]
 const AT_EMPTY_PATH: libc::c_int = 0;
-
-fn try_to_usize(n: u64) -> Result<usize, OsErr> {
-    let m = n as usize;
-    if m as u64 == n { Ok(m) } else { Err(OsErr::from(libc::EOVERFLOW as usize)) }
-}
