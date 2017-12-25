@@ -12,6 +12,12 @@ impl OsErr {
     #[inline] pub fn from_sysret(m: isize) -> Result<usize, Self> {
         if m < 0 { Err(Self::from(-m as usize)) } else { Ok(m as usize) }
     }
+
+    #[inline] pub fn code(self) -> usize {
+        match self {
+            Unknown(m) => m,
+        }
+    }
 }
 
 impl From<usize> for OsErr {
