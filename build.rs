@@ -1,3 +1,5 @@
+extern crate libc;
+
 use std::{env, mem};
 use std::fs::File;
 use std::io::*;
@@ -29,10 +31,14 @@ fn main() {
         };
         match usize::from_str(&n) {
             Ok(n) => {
+                if let Ok(s) = unsafe { ::std::ffi::CStr::from_ptr(::libc::strerror(n as _)) }.to_str() {
+                    writeln!(&mut f, "/// {}", s).unwrap();
+                }
                 writeln!(&mut f, "pub const {}: OsErr = OsErr({});", e, n).unwrap();
                 put_opt(&mut es, n, e);
             },
             _ => {
+                writeln!(&mut f, "/// Alias for [{0}](constant.{0}.html)", n).unwrap();
                 writeln!(&mut f, "pub const {}: OsErr = {};", e, n).unwrap();
             }
         }
