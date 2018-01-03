@@ -27,7 +27,7 @@ impl WaitSpec {
             let mut ru: ::libc::rusage = mem::uninitialized();
             si.si.pid = 0;
             esyscall!(WAITID, id_type, id, &mut si as *mut _, flags.bits, &mut ru as *mut _)?;
-            if 0 == si.si.pid { return Err(OsErr::from(::libc::EWOULDBLOCK as usize)) }
+            if 0 == si.si.pid { return Err(EWOULDBLOCK) }
             Ok((WaitInfo::from_c(si.si), ru))
         }
     }

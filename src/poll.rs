@@ -39,7 +39,7 @@ impl PollExt for [Poll] {
     fn poll(&mut self, t: Option<Span>) -> Result<usize, OsErr> {
         let t = match t {
             None => None,
-            Some(t) => Some(t.to_c_timespec().ok_or(OsErr::from(::libc::ERANGE as usize))?),
+            Some(t) => Some(t.to_c_timespec().ok_or(ERANGE)?),
         };
         unsafe { esyscall!(POLL, self.as_ptr(), self.len(), t.as_ref().map_or(::core::ptr::null(), |p| p as *const _), 0) }
     }

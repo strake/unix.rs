@@ -159,17 +159,15 @@ fn from_opt_dir(opt_dir: Option<&File>) -> isize {
 pub fn mktemp_at<R: Clone, Rng: RandomGen>
   (opt_dir: Option<&File>, templ: &mut OsStr, range: R, rng: &mut Rng, flags: OpenFlags) ->
   Result<File, OsErr> where [u8]: IndexMut<R, Output = [u8]> {
-    const EEXIST: usize = libc::EEXIST as usize;
-
     let tries = 0x100;
     for _ in 0..tries {
         randname(rng, &mut templ[range.clone()]);
         match open_at(opt_dir, templ, RdWr, flags | O_CREAT | O_EXCL, Perm::Read << USR) {
-            Err(OsErr::Unknown(EEXIST)) => (),
+            Err(EEXIST) => (),
             r_f => return r_f,
         }
     }
-    Err(OsErr::from(EEXIST))
+    Err(EEXIST)
 }
 
 #[inline]
@@ -204,7 +202,7 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
         NoClobber | Clobber => mode,
         ClobberSavingPerms => match stat_at(opt_dir, path, AtFlags::empty()) {
             Ok(st) => st.mode,
-            Err(OsErr::Unknown(c)) if libc::ENOENT == c as _ => mode,
+            Err(OsErr(c)) if libc::ENOENT == c as _ => mode,
             Err(e) => return Err(e),
         },
     }));
