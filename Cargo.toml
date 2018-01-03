@@ -12,7 +12,7 @@ fallible = "0.1"
 i-o = "0.3"
 isaac = "0.1"
 libc = { version = "0.2", default-features = false }
-null-terminated = "0.2.2"
+null-terminated = "0.2.7"
 rm = "0.3.2"
 syscall = "0.2"
 tempus = { version = "0.2.2", features = ["libc"] }

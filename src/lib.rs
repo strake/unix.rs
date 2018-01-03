@@ -20,6 +20,7 @@ extern crate void;
 
 #[macro_use]
 pub mod err;
+pub mod env;
 pub mod file;
 pub mod poll;
 pub mod process;
