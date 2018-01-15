@@ -14,6 +14,11 @@ pub fn quit(code: isize) -> ! { unsafe {
     ::core::intrinsics::abort()
 } }
 
+#[inline]
+pub fn pid() -> Id { unsafe { syscall!(GETPID) as _ } }
+#[inline]
+pub fn ppid() -> Id { unsafe { syscall!(GETPPID) as _ } }
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WaitSpec { Pid(Id), Gid(Id), All }
