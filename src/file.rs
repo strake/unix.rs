@@ -330,12 +330,14 @@ bitflags! {
         const O_CREAT    = libc::O_CREAT    as usize;
         const O_EXCL     = libc::O_EXCL     as usize;
         const O_NONBLOCK = libc::O_NONBLOCK as usize;
+        const O_NOCTTY   = libc::O_NOCTTY   as usize;
     }
 }
 pub const O_CLOEXEC : OpenFlags = OpenFlags::O_CLOEXEC;
 pub const O_CREAT   : OpenFlags = OpenFlags::O_CREAT;
 pub const O_EXCL    : OpenFlags = OpenFlags::O_EXCL;
 pub const O_NONBLOCK: OpenFlags = OpenFlags::O_NONBLOCK;
+pub const O_NOCTTY  : OpenFlags = OpenFlags::O_NOCTTY;
 
 bitflags! {
     pub struct AtFlags: usize {
