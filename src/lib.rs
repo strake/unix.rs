@@ -1,6 +1,7 @@
 #![no_std]
 
 #![feature(const_fn)]
+#![feature(const_size_of)]
 #![feature(core_intrinsics)]
 #![feature(i128_type)]
 
@@ -25,6 +26,7 @@ pub mod file;
 pub mod poll;
 pub mod process;
 pub mod mem;
+pub mod signal;
 pub mod str { pub type OsStr = ::null_terminated::Nul<u8>; }
 pub mod time;
 
