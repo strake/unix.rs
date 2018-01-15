@@ -14,7 +14,8 @@ fn main() {
     c_defns("errno.h", |e, n| { if e.starts_with("E") {
         match usize::from_str(&n) {
             Ok(n) => {
-                if let Ok(s) = unsafe { ::std::ffi::CStr::from_ptr(::libc::strerror(n as _)) }.to_str() {
+                if let (Ok(s), true) = (unsafe { ::std::ffi::CStr::from_ptr(::libc::strerror(n as _)) }.to_str(),
+                                        env::var("HOST") == env::var("TARGET")) {
                     writeln!(&mut f, "/// {}", s)?;
                 }
                 writeln!(&mut f, "pub const {}: OsErr = OsErr({});", e, n)?;
