@@ -1,6 +1,6 @@
 [package]
 name = "unix"
-version = "0.3.2"
+version = "0.4.0"
 authors = ["M Farkas-Dyck <strake888@gmail.com>"]
 description = "Interface to Unix system facilities"
 license = "MIT OR Apache-2.0"
@@ -9,7 +9,7 @@ documentation = "https://docs.rs/unix/"
 [dependencies]
 bitflags = "1.0"
 fallible = "0.1"
-i-o = "0.3"
+i-o = "0.4"
 isaac = "0.1"
 libc = { version = "0.2", default-features = false }
 null-terminated = "0.2.7"
