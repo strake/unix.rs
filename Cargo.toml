@@ -10,6 +10,7 @@ documentation = "https://docs.rs/unix/"
 bitflags = "1.0"
 fallible = "0.1"
 i-o = "0.4"
+idem = "0.1"
 isaac = "0.1"
 libc = { version = "0.2", default-features = false }
 null-terminated = "0.2.7"

@@ -1,4 +1,5 @@
 use core::ops::*;
+use idem::Zero;
 use tempus::Span;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -49,3 +50,19 @@ impl SubAssign<Span> for EpochTime {
     #[inline]
     fn sub_assign(&mut self, other: Span) { self.0 -= other.to_ns() }
 }
+
+#[inline]
+pub fn sleep_for(t: Span) -> Result<(), Span> { unsafe {
+    assert!(Span::zero < t);
+    let mut rem = ::core::mem::uninitialized();
+    esyscall_!(CLOCK_NANOSLEEP, ::libc::CLOCK_MONOTONIC, 0,
+               &t.to_c_timespec().expect("timespan too long") as *const _,
+               &mut rem as *mut _).map_err(|_| rem)
+} }
+
+#[inline]
+pub fn sleep_until(t: EpochTime) -> Result<(), ()> { unsafe {
+    esyscall_!(CLOCK_NANOSLEEP, ::libc::CLOCK_REALTIME, ::libc::TIMER_ABSTIME,
+               &(t - EpochTime(0)).to_c_timespec().expect("timespan too long") as *const _)
+        .map_err(|_| ())
+} }

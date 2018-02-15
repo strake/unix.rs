@@ -9,6 +9,7 @@ extern crate bitflags;
 #[macro_use]
 extern crate syscall;
 extern crate fallible;
+extern crate idem;
 extern crate io;
 extern crate isaac;
 extern crate libc;
