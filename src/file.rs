@@ -1,5 +1,5 @@
 use core::fmt;
-use core::intrinsics::unreachable as unreach;
+use core::hint::unreachable_unchecked as unreach;
 use core::mem;
 use core::ops::*;
 use fallible::*;
