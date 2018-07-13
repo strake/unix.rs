@@ -6,12 +6,10 @@ use fallible::*;
 use libc;
 use null_terminated::Nul;
 use io::*;
-use isaac::Rng;
 use rand::*;
 use void::Void;
 
 use err::*;
-use random::*;
 use str::*;
 use time::*;
 use util::*;
@@ -156,8 +154,8 @@ fn from_opt_dir(opt_dir: Option<&File>) -> isize {
 }
 
 #[inline]
-pub fn mktemp_at<R: Clone, Rng: RandomGen>
-  (opt_dir: Option<&File>, templ: &mut OsStr, range: R, rng: &mut Rng, flags: OpenFlags) ->
+pub fn mktemp_at<R: Clone, TheRng: Rng>
+  (opt_dir: Option<&File>, templ: &mut OsStr, range: R, rng: &mut TheRng, flags: OpenFlags) ->
   Result<File, OsErr> where [u8]: IndexMut<R, Output = [u8]> {
     let tries = 0x100;
     for _ in 0..tries {
@@ -171,7 +169,7 @@ pub fn mktemp_at<R: Clone, Rng: RandomGen>
 }
 
 #[inline]
-fn randname<Rng: RandomGen>(rng: &mut Rng, bs: &mut [u8]) {
+fn randname<TheRng: Rng>(rng: &mut TheRng, bs: &mut [u8]) {
     let base = 'Z' as u64 - '@' as u64;
     let mut n: u64 = rng.gen();
     for p in bs.iter_mut() {
@@ -192,7 +190,8 @@ pub use self::Clobber::*;
 pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
   (opt_dir: Option<&File>, path: &OsStr,
    clobber: Clobber, mode: FileMode, writer: F) -> Result<T, OsErr> {
-    let mut rng: Rng = OsRandom::new().gen();
+    let mut rng = StdRng::from_rng(::random::OsRandom::new())
+        .map_err(|_| OsErr(::libc::EIO as _))?;
 
     let mut temp_path = [b' '; 13];
     { let l = temp_path.len(); temp_path[l - 1] = 0; }

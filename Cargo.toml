@@ -11,10 +11,9 @@ flags = "0.1"
 fallible = "0.1"
 i-o = "0.4"
 idem = "0.1"
-isaac = "0.1"
 libc = { version = "0.2", default-features = false }
 null-terminated = "0.2.7"
-rm = "0.3.2"
+rand = { version = "0.5.4", default-features = false }
 syscall = "0.2"
 tempus = { version = "0.2.2", features = ["libc"] }
 void = { version = "1", default-features = false }

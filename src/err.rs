@@ -18,6 +18,9 @@ impl OsErr {
     #[inline] pub fn from_sysret(m: isize) -> Result<usize, Self> {
         if m < 0 { Err(Self::from(-m as usize)) } else { Ok(m as usize) }
     }
+
+    #[inline]
+    pub fn message(self) -> &'static str { error_messages.get(self.0).unwrap_or(&"") }
 }
 
 impl From<usize> for OsErr {

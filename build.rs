@@ -11,12 +11,14 @@ fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
     let mut f = File::create(&Path::new(&out_dir).join("e.rs")).unwrap();
     let mut es = Vec::with_capacity(256);
+    let mut ss = Vec::with_capacity(256);
     c_defns("errno.h", |e, n| { if e.starts_with("E") {
         match usize::from_str(&n) {
             Ok(n) => {
                 if let (Ok(s), true) = (unsafe { ::std::ffi::CStr::from_ptr(::libc::strerror(n as _)) }.to_str(),
                                         env::var("HOST") == env::var("TARGET")) {
                     writeln!(&mut f, "/// {}", s)?;
+                    put_opt(&mut ss, n, s);
                 }
                 writeln!(&mut f, "pub const {}: OsErr = OsErr({});", e, n)?;
                 put_opt(&mut es, n, e);
@@ -29,6 +31,9 @@ fn main() {
     } Ok(()) }).unwrap();
     writeln!(&mut f, "const error_names: [Option<&'static str>; {}] = [", es.len()).unwrap();
     for e in &es { writeln!(&mut f, "    {:?},", e).unwrap(); }
+    writeln!(&mut f, "];").unwrap();
+    writeln!(&mut f, "const error_messages: [&'static str; {}] = [", es.len()).unwrap();
+    for s in &ss { writeln!(&mut f, "    {:?},", s.unwrap_or("")).unwrap(); }
     writeln!(&mut f, "];").unwrap();
 }
 

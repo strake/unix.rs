@@ -2,7 +2,6 @@
 
 #![feature(const_fn)]
 #![feature(core_intrinsics)]
-#![feature(i128_type)]
 
 #[macro_use]
 extern crate bitflags;
@@ -11,11 +10,10 @@ extern crate syscall;
 extern crate fallible;
 extern crate idem;
 extern crate io;
-extern crate isaac;
 extern crate libc;
 #[macro_use]
 extern crate null_terminated;
-extern crate random as rand;
+extern crate rand;
 extern crate time as tempus;
 extern crate void;
 
