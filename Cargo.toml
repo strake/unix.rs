@@ -1,23 +1,12 @@
 [package]
 name = "unix"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["M Farkas-Dyck <strake888@gmail.com>"]
 description = "Interface to Unix system facilities"
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/unix/"
 
 [dependencies]
-bitflags = "1.0"
-fallible = "0.1"
-i-o = "0.4"
-idem = "0.1"
-isaac = "0.1"
-libc = { version = "0.2", default-features = false }
-null-terminated = "0.2.7"
 rm = "0.3.2"
 syscall = "0.2"
-tempus = { version = "0.2.2", features = ["libc"] }
-void = { version = "1", default-features = false }
-
-[build-dependencies]
-libc = { version = "0.2", default-features = false }
+unix = "0.5"
