@@ -32,7 +32,7 @@ fn main() {
     writeln!(&mut f, "const error_names: [Option<&'static str>; {}] = [", es.len()).unwrap();
     for e in &es { writeln!(&mut f, "    {:?},", e).unwrap(); }
     writeln!(&mut f, "];").unwrap();
-    writeln!(&mut f, "const error_messages: [&'static str; {}] = [", es.len()).unwrap();
+    writeln!(&mut f, "const error_messages: [&'static str; {}] = [", ss.len()).unwrap();
     for s in &ss { writeln!(&mut f, "    {:?},", s.unwrap_or("")).unwrap(); }
     writeln!(&mut f, "];").unwrap();
 }
