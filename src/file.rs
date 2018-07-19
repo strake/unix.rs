@@ -197,6 +197,14 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
     { let l = temp_path.len(); temp_path[l - 1] = 0; }
     let temp_path_ref = <&mut OsStr>::try_from(&mut temp_path[..]).unwrap();
     let f = try!(mktemp_at(opt_dir, temp_path_ref, 0..12, &mut rng, OpenFlags::empty()));
+
+    struct Rm<'a, 'b> { opt_dir: Option<&'a File>, path: &'b OsStr };
+    impl<'a, 'b> Drop for Rm<'a, 'b> {
+        #[inline]
+        fn drop(&mut self) { unlink_at(self.opt_dir, self.path).unwrap_or(()) }
+    }
+    let rm = Rm { opt_dir, path: temp_path_ref };
+
     try!(f.chmod(match clobber {
         NoClobber | Clobber => mode,
         ClobberSavingPerms => match stat_at(opt_dir, path, AtFlags::empty()) {
@@ -209,11 +217,11 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
     let m = try!(writer(f));
 
     match clobber {
-        NoClobber => {
-            try!(link_at(opt_dir, temp_path_ref, opt_dir, path, AtFlags::empty()));
-            let _ = unlink_at(opt_dir, temp_path_ref);
+        NoClobber => try!(link_at(opt_dir, temp_path_ref, opt_dir, path, AtFlags::empty())),
+        Clobber | ClobberSavingPerms => {
+            try!(rename_at(opt_dir, temp_path_ref, opt_dir, path));
+            mem::forget(rm);
         },
-        Clobber | ClobberSavingPerms => try!(rename_at(opt_dir, temp_path_ref, opt_dir, path)),
     }
     Ok(m)
 }
