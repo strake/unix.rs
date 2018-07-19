@@ -108,7 +108,7 @@ pub fn link_at(opt_old_dir: Option<&File>, old_path: &OsStr,
 
 #[inline]
 pub fn unlink_at(opt_dir: Option<&File>, path: &OsStr) -> Result<(), OsErr> {
-    unsafe { esyscall_!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr()) }
+    unsafe { esyscall_!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr(), 0) }
 }
 
 #[inline]
