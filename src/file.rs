@@ -191,7 +191,7 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
   (opt_dir: Option<&File>, path: &OsStr,
    clobber: Clobber, mode: FileMode, writer: F) -> Result<T, OsErr> {
     let mut rng = StdRng::from_rng(::random::OsRandom::new())
-        .map_err(|_| OsErr(::libc::EIO as _))?;
+        .map_err(|_| ::err::EIO)?;
 
     let mut temp_path = [b' '; 13];
     { let l = temp_path.len(); temp_path[l - 1] = 0; }
@@ -209,7 +209,7 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
         NoClobber | Clobber => mode,
         ClobberSavingPerms => match stat_at(opt_dir, path, AtFlags::empty()) {
             Ok(st) => st.mode,
-            Err(OsErr(c)) if libc::ENOENT == c as _ => mode,
+            Err(::err::ENOENT) => mode,
             Err(e) => return Err(e),
         },
     }));
