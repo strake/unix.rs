@@ -1,5 +1,5 @@
 use core::ops::{Deref, DerefMut};
-use core::{ptr, slice};
+use core::{mem, ptr, slice};
 use err::*;
 use file::*;
 use libc;
@@ -8,6 +8,15 @@ use util::*;
 pub struct Map {
     ptr: *mut u8,
     length: usize,
+}
+
+impl Map {
+    #[inline]
+    pub fn leak(self) -> &'static mut [u8] {
+        let Map { ptr, length } = self;
+        mem::forget(self);
+        unsafe { slice::from_raw_parts_mut(ptr, length) }
+    }
 }
 
 impl Deref for Map {
