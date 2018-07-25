@@ -1,4 +1,5 @@
-use null_terminated::Nul;
+use fallible::TryInto;
+use null_terminated::{Nul, NulStr};
 
 #[link_name = "__environ"]
 extern { pub static environ: Environ<'static>; }
@@ -18,5 +19,17 @@ impl<'a> Environ<'a> {
             if *s == *k { return Some(v); }
         }
         None
+    }
+
+    #[inline]
+    pub fn get_str<'b>(&self, s: &'b [u8]) -> Option<Option<&'a NulStr>> {
+        match self.get(s) {
+            None => None,
+            Some(None) => Some(None),
+            Some(Some(t)) => match t.try_into() {
+                Err(_) => None,
+                Ok(t) => Some(Some(t)),
+            }
+        }
     }
 }
