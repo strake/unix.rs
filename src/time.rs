@@ -1,4 +1,4 @@
-use core::ops::*;
+use core::{mem, ops::*};
 use idem::Zero;
 use tempus::Span;
 
@@ -6,6 +6,13 @@ use tempus::Span;
 pub struct EpochTime(i128);
 
 impl EpochTime {
+    #[inline]
+    pub fn now() -> Self { unsafe {
+        let mut t = mem::uninitialized();
+        syscall!(CLOCK_GETTIME, ::libc::CLOCK_REALTIME, &mut t as *mut _);
+        Self::from_c_timespec(t)
+    } }
+
     #[inline]
     pub fn from_ns_since_epoch(n: i128) -> Self { EpochTime(n) }
 
@@ -54,7 +61,7 @@ impl SubAssign<Span> for EpochTime {
 #[inline]
 pub fn sleep_for(t: Span) -> Result<(), Span> { unsafe {
     assert!(Span::zero < t);
-    let mut rem = ::core::mem::uninitialized();
+    let mut rem = mem::uninitialized();
     esyscall_!(CLOCK_NANOSLEEP, ::libc::CLOCK_MONOTONIC, 0,
                &t.to_c_timespec().expect("timespan too long") as *const _,
                &mut rem as *mut _).map_err(|_| rem)
