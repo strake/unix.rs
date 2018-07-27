@@ -14,8 +14,6 @@ use str::*;
 use time::*;
 use util::*;
 
-use self::OpenMode::*;
-
 pub struct File {
     fd: isize
 }
@@ -82,10 +80,9 @@ pub fn new_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { unsafe {
 pub fn mk_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { new_pipe(flags) }
 
 #[inline]
-pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode, flags: OpenFlags,
+pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode,
                f_mode: FileMode) -> Result<File, OsErr> {
-    unsafe { esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(),
-                       flags.bits | o_mode.to_usize(), f_mode.bits) }
+    unsafe { esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(), o_mode.0, f_mode.bits) }
         .map(|fd| File { fd: fd as isize })
 }
 
@@ -160,7 +157,8 @@ pub fn mktemp_at<R: Clone, TheRng: Rng>
     let tries = 0x100;
     for _ in 0..tries {
         randname(rng, &mut templ[range.clone()]);
-        match open_at(opt_dir, templ, RdWr, flags | O_CREAT | O_EXCL, Perm::Read << USR) {
+        match open_at(opt_dir, templ, OpenMode::RdWr | flags | O_CREAT | O_EXCL,
+                      Perm::Read << USR) {
             Err(EEXIST) => (),
             r_f => return r_f,
         }
@@ -315,20 +313,47 @@ impl FileModeSection {
     fn pos(self) -> u32 { match self { USR => 6, GRP => 3, OTH => 0 } }
 }
 
-pub enum OpenMode {
-    RdOnly,
-    WrOnly,
-    RdWr,
-}
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct OpenMode(usize);
 
 impl OpenMode {
-    #[inline] fn to_usize(self) -> usize {
-        match self {
-            RdOnly => libc::O_RDONLY as usize,
-            WrOnly => libc::O_WRONLY as usize,
-            RdWr   => libc::O_RDWR   as usize,
-        }
-    }
+    pub const RdOnly: Self = OpenMode(libc::O_RDONLY as _);
+    pub const WrOnly: Self = OpenMode(libc::O_WRONLY as _);
+    pub const RdWr  : Self = OpenMode(libc::O_RDWR   as _);
+}
+
+impl BitOr<OpenFlags> for OpenMode {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, flags: OpenFlags) -> Self { OpenMode(self.0 | flags.bits) }
+}
+
+impl BitAnd<OpenFlags> for OpenMode {
+    type Output = Self;
+    #[inline]
+    fn bitand(self, flags: OpenFlags) -> Self { OpenMode(self.0 & flags.bits) }
+}
+
+impl BitXor<OpenFlags> for OpenMode {
+    type Output = Self;
+    #[inline]
+    fn bitxor(self, flags: OpenFlags) -> Self { OpenMode(self.0 ^ flags.bits) }
+}
+
+impl BitOrAssign<OpenFlags> for OpenMode {
+    #[inline]
+    fn bitor_assign(&mut self, flags: OpenFlags) { self.0 |= flags.bits }
+}
+
+impl BitAndAssign<OpenFlags> for OpenMode {
+    #[inline]
+    fn bitand_assign(&mut self, flags: OpenFlags) { self.0 &= flags.bits }
+}
+
+impl BitXorAssign<OpenFlags> for OpenMode {
+    #[inline]
+    fn bitxor_assign(&mut self, flags: OpenFlags) { self.0 ^= flags.bits }
 }
 
 bitflags! {
