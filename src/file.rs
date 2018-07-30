@@ -14,6 +14,7 @@ use str::*;
 use time::*;
 use util::*;
 
+#[derive(Debug)]
 pub struct File {
     fd: isize
 }
@@ -176,6 +177,7 @@ fn randname<TheRng: Rng>(rng: &mut TheRng, bs: &mut [u8]) {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Clobber {
     NoClobber,
     Clobber,
@@ -377,6 +379,7 @@ bitflags! {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Stat {
     pub dev:     libc::dev_t,
     pub ino:     libc::ino_t,

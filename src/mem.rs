@@ -5,6 +5,7 @@ use file::*;
 use libc;
 use util::*;
 
+#[derive(Debug)]
 pub struct Map {
     ptr: *mut u8,
     length: usize,

@@ -1,5 +1,7 @@
 #![no_std]
 
+#![deny(missing_debug_implementations)]
+
 #![feature(const_fn)]
 #![feature(core_intrinsics)]
 
