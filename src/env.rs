@@ -4,6 +4,7 @@ use null_terminated::{Nul, NulStr};
 #[link_name = "__environ"]
 extern { pub static environ: Environ<'static>; }
 
+#[repr(transparent)]
 pub struct Environ<'a>(pub &'a Nul<&'a Nul<u8>>);
 
 impl<'a> Environ<'a> {
