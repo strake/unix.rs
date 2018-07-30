@@ -151,7 +151,6 @@ fn from_opt_dir(opt_dir: Option<&File>) -> isize {
     }
 }
 
-#[inline]
 pub fn mktemp_at<R: Clone, TheRng: Rng>
   (opt_dir: Option<&File>, templ: &mut OsStr, range: R, rng: &mut TheRng, flags: OpenFlags) ->
   Result<File, OsErr> where [u8]: IndexMut<R, Output = [u8]> {
@@ -186,7 +185,6 @@ pub enum Clobber {
 
 pub use self::Clobber::*;
 
-#[inline]
 pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
   (opt_dir: Option<&File>, path: &OsStr,
    clobber: Clobber, mode: FileMode, writer: F) -> Result<T, OsErr> {
