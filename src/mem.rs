@@ -1,5 +1,4 @@
-use core::ops::{Deref, DerefMut};
-use core::{mem, ptr, slice};
+use core::{mem, num::NonZeroUsize, ops::{Deref, DerefMut}, ptr, slice};
 use err::*;
 use file::*;
 use libc;
@@ -113,6 +112,6 @@ unsafe fn do_map(fd: isize, loc: *mut u8, perm: Perm, offset: u64, length: usize
     let ptr = syscall!(MMAP, loc, length, Prot::from(perm).bits,
                        if loc.is_null() { 0 } else { libc::MAP_FIXED }, fd, offset) as *mut u8;
     if (ptr as usize) > 0x1000usize.wrapping_neg() {
-        Err(OsErr::from((ptr as usize).wrapping_neg()))
+        Err(OsErr::from(NonZeroUsize::new_unchecked((ptr as usize).wrapping_neg())))
     } else { Ok(Map { ptr: ptr as *mut u8, length: length }) }
 }

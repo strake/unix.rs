@@ -1,13 +1,14 @@
-use core::fmt;
+use core::{fmt, num::NonZeroUsize};
 use io::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct OsErr(pub usize);
+#[repr(transparent)]
+pub struct OsErr(pub NonZeroUsize);
 
 impl fmt::Debug for OsErr {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match error_names.get(self.0) {
+        match error_names.get(self.0.get()) {
             Some(&Some(s)) => write!(f, "{}", s),
             _ => write!(f, "OsErr({})", self.0),
         }
@@ -16,19 +17,20 @@ impl fmt::Debug for OsErr {
 
 impl OsErr {
     #[inline] pub fn from_sysret(m: isize) -> Result<usize, Self> {
-        if m < 0 { Err(Self::from(-m as usize)) } else { Ok(m as usize) }
+        if m < 0 { Err(Self::from(unsafe { NonZeroUsize::new_unchecked(-m as usize) })) }
+        else { Ok(m as usize) }
     }
 
     #[inline]
-    pub fn message(self) -> &'static str { error_messages.get(self.0).unwrap_or(&"") }
+    pub fn message(self) -> &'static str { error_messages.get(self.0.get()).unwrap_or(&"") }
 }
 
-impl From<usize> for OsErr {
-    #[inline] fn from(n: usize) -> Self { OsErr(n) }
+impl From<NonZeroUsize> for OsErr {
+    #[inline] fn from(n: NonZeroUsize) -> Self { OsErr(n) }
 }
 
 impl From<EndOfFile> for OsErr {
-    #[inline] fn from(_: EndOfFile) -> Self { OsErr(0) }
+    #[inline] fn from(_: EndOfFile) -> Self { OsErr(unsafe { NonZeroUsize::new_unchecked(!0) }) }
 }
 
 impl From<NoMemory> for OsErr {

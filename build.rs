@@ -14,13 +14,14 @@ fn main() {
     let mut ss = Vec::with_capacity(256);
     c_defns("errno.h", |e, n| { if e.starts_with("E") {
         match usize::from_str(&n) {
+            Ok(0) => (),
             Ok(n) => {
                 if let (Ok(s), true) = (unsafe { ::std::ffi::CStr::from_ptr(::libc::strerror(n as _)) }.to_str(),
                                         env::var("HOST") == env::var("TARGET")) {
                     writeln!(&mut f, "/// {}", s)?;
                     put_opt(&mut ss, n, s);
                 }
-                writeln!(&mut f, "pub const {}: OsErr = OsErr({});", e, n)?;
+                writeln!(&mut f, "pub const {}: OsErr = OsErr(unsafe {{ NonZeroUsize::new_unchecked({}) }});", e, n)?;
                 put_opt(&mut es, n, e);
             },
             _ => {
