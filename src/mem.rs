@@ -113,5 +113,5 @@ unsafe fn do_map(fd: isize, loc: *mut u8, perm: Perm, offset: u64, length: usize
                        if loc.is_null() { 0 } else { libc::MAP_FIXED }, fd, offset) as *mut u8;
     if (ptr as usize) > 0x1000usize.wrapping_neg() {
         Err(OsErr::from(NonZeroUsize::new_unchecked((ptr as usize).wrapping_neg())))
-    } else { Ok(Map { ptr: ptr as *mut u8, length: length }) }
+    } else { Ok(Map { ptr: ptr as *mut u8, length }) }
 }

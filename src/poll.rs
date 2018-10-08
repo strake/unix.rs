@@ -13,11 +13,11 @@ pub struct Poll {
 impl Poll {
     #[inline]
     pub fn new(f: &File, ev: Event) -> Self { Poll {
-        fd: f.fd() as _, ev: ev, r: Event::empty(),
+        fd: f.fd() as _, ev, r: Event::empty(),
     } }
 
     #[inline]
-    pub fn ready(&self) -> Event { self.r }
+    pub fn ready(self) -> Event { self.r }
 }
 
 bitflags! {

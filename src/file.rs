@@ -62,11 +62,11 @@ impl File {
     pub fn new(fd: isize) -> Option<Self> {
         if unsafe {
             syscall!(FCNTL, fd, ::libc::F_GETFD) as isize
-        } >= 0 { Some(File { fd: fd }) } else { None }
+        } >= 0 { Some(File { fd }) } else { None }
     }
 
     #[inline]
-    pub const fn new_unchecked(fd: isize) -> Self { File { fd: fd } }
+    pub const fn new_unchecked(fd: isize) -> Self { File { fd } }
 }
 
 #[inline]
