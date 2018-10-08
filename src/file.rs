@@ -82,9 +82,12 @@ pub fn mk_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { new_pipe(flags
 
 #[inline]
 pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode,
-               f_mode: FileMode) -> Result<File, OsErr> {
-    unsafe { esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(), o_mode.0, f_mode.bits) }
-        .map(|fd| File { fd: fd as isize })
+                 f_mode: Option<FileMode>) -> Result<File, OsErr> {
+    unsafe { match f_mode {
+        None => esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(), o_mode.0),
+        Some(f_mode) => esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(),
+                                  o_mode.0 | ::libc::O_CREAT as usize, f_mode.bits),
+    } }.map(|fd| File { fd: fd as isize })
 }
 
 #[inline]
@@ -157,8 +160,7 @@ pub fn mktemp_at<R: Clone, TheRng: Rng>
     let tries = 0x100;
     for _ in 0..tries {
         randname(rng, &mut templ[range.clone()]);
-        match open_at(opt_dir, templ, OpenMode::RdWr | flags | O_CREAT | O_EXCL,
-                      Perm::Read << USR) {
+        match open_at(opt_dir, templ, OpenMode::RdWr | flags | O_EXCL, Some(Perm::Read << USR)) {
             Err(EEXIST) => (),
             r_f => return r_f,
         }
@@ -359,14 +361,12 @@ impl BitXorAssign<OpenFlags> for OpenMode {
 bitflags! {
     pub struct OpenFlags: usize {
         const O_CLOEXEC  = libc::O_CLOEXEC  as usize;
-        const O_CREAT    = libc::O_CREAT    as usize;
         const O_EXCL     = libc::O_EXCL     as usize;
         const O_NONBLOCK = libc::O_NONBLOCK as usize;
         const O_NOCTTY   = libc::O_NOCTTY   as usize;
     }
 }
 pub const O_CLOEXEC : OpenFlags = OpenFlags::O_CLOEXEC;
-pub const O_CREAT   : OpenFlags = OpenFlags::O_CREAT;
 pub const O_EXCL    : OpenFlags = OpenFlags::O_EXCL;
 pub const O_NONBLOCK: OpenFlags = OpenFlags::O_NONBLOCK;
 pub const O_NOCTTY  : OpenFlags = OpenFlags::O_NOCTTY;
