@@ -190,7 +190,7 @@ pub use self::Clobber::*;
 pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
   (opt_dir: Option<&File>, path: &OsStr,
    clobber: Clobber, mode: FileMode, writer: F) -> Result<T, OsErr> {
-    let mut rng = XorShiftRng::from_rng(::random::OsRandom::new())
+    let mut rng = ::rand::rngs::SmallRng::from_rng(::random::OsRandom::new())
         .map_err(|_| ::err::EIO)?;
 
     let mut temp_path = [b' '; 13];

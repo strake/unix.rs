@@ -13,7 +13,7 @@ i-o = "0.4"
 idem = "0.1"
 libc = { version = "0.2", default-features = false }
 null-terminated = "0.3.3"
-rand = { version = "0.5.4", default-features = false }
+rand = { version = "0.6.0", default-features = false }
 syscall = "0.2"
 tempus = { version = "0.2.2", features = ["libc"] }
 void = { version = "1", default-features = false }
