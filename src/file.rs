@@ -167,7 +167,6 @@ pub fn mktemp_at<R: Clone, TheRng: Rng>
     Err(Error::EEXIST)
 }
 
-#[inline]
 fn randname<TheRng: Rng>(rng: &mut TheRng, bs: &mut [u8]) {
     let base = 'Z' as u64 - '@' as u64;
     let mut n: u64 = rng.gen();
@@ -193,7 +192,7 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, Error>, T>
         .map_err(|_| Error::EIO)?;
 
     let mut temp_path = [b' '; 13];
-    { let l = temp_path.len(); temp_path[l - 1] = 0; }
+    temp_path[temp_path.len() - 1] = 0;
     let temp_path_ref = <&mut Str>::try_from(&mut temp_path[..]).unwrap();
     let f = try!(mktemp_at(opt_dir, temp_path_ref, 0..12, &mut rng, OpenFlags::empty()));
 

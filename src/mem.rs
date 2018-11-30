@@ -42,9 +42,9 @@ impl Drop for Map {
 
 bitflags! {
     struct Prot: usize {
-        const PROT_EXEC  = libc::PROT_EXEC  as usize;
-        const PROT_READ  = libc::PROT_READ  as usize;
-        const PROT_WRITE = libc::PROT_WRITE as usize;
+        const EXEC  = libc::PROT_EXEC  as usize;
+        const READ  = libc::PROT_READ  as usize;
+        const WRITE = libc::PROT_WRITE as usize;
     }
 }
 
@@ -52,9 +52,9 @@ impl From<Perm> for Prot {
     #[inline]
     fn from(perm: Perm) -> Prot {
         let mut prot = Prot::empty();
-        for &(prt, prm) in &[(Prot::PROT_READ,  Perm::Read),
-                             (Prot::PROT_WRITE, Perm::Write),
-                             (Prot::PROT_EXEC,  Perm::Exec)] {
+        for &(prt, prm) in &[(Prot::READ,  Perm::Read),
+                             (Prot::WRITE, Perm::Write),
+                             (Prot::EXEC,  Perm::Exec)] {
             if perm.contains(prm) { prot |= prt; }
         }
         prot
