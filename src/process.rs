@@ -76,24 +76,17 @@ impl WaitInfo {
     }
 }
 
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum WaitCode { Exit = 1, Kill = 2, Dump = 3, Trap = 4, Stop = 5, Cont = 6 }
+pub struct WaitCode(::libc::c_int);
 
 impl WaitCode {
-    #[inline]
-    unsafe fn from_c(c: ::libc::c_int) -> Self {
-        use self::WaitCode::*;
-        match c {
-            1 => Exit,
-            2 => Kill,
-            3 => Dump,
-            4 => Trap,
-            5 => Stop,
-            6 => Cont,
-            _ => mem::uninitialized()
-        }
-    }
+    pub const Exit: Self = WaitCode(1);
+    pub const Kill: Self = WaitCode(2);
+    pub const Dump: Self = WaitCode(3);
+    pub const Trap: Self = WaitCode(4);
+    pub const Stop: Self = WaitCode(5);
+    pub const Cont: Self = WaitCode(6);
 }
 
 #[cfg(target_os = "linux")]
