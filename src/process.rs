@@ -1,10 +1,10 @@
 use core::mem;
 pub use libc::id_t as Id;
 
-use err::*;
+use Error;
 
 #[inline]
-pub fn fork() -> Result<Id, OsErr> { unsafe { esyscall!(FORK).map(|pid| pid as _) } }
+pub fn fork() -> Result<Id, Error> { unsafe { esyscall!(FORK).map(|pid| pid as _) } }
 
 #[inline]
 pub fn quit(code: isize) -> ! { unsafe {
@@ -25,14 +25,14 @@ pub enum WaitSpec { Pid(Id), Gid(Id), All }
 
 impl WaitSpec {
     #[inline]
-    pub fn wait(self, flags: WaitFlags) -> Result<(WaitInfo, ::libc::rusage), OsErr> {
+    pub fn wait(self, flags: WaitFlags) -> Result<(WaitInfo, ::libc::rusage), Error> {
         unsafe {
             let (id_type, id) = self.to_wait_args();
             let mut si: siginfo = mem::uninitialized();
             let mut ru: ::libc::rusage = mem::uninitialized();
             si.si.pid = 0;
             esyscall!(WAITID, id_type, id, &mut si as *mut _, flags.bits, &mut ru as *mut _)?;
-            if 0 == si.si.pid { return Err(EWOULDBLOCK) }
+            if 0 == si.si.pid { return Err(Error::EWOULDBLOCK) }
             Ok((WaitInfo::from_c(si.si), ru))
         }
     }

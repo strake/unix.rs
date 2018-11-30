@@ -1,7 +1,8 @@
 use core::{mem, num::NonZeroUsize, ops::{Deref, DerefMut}, ptr, slice};
-use err::*;
-use file::*;
 use libc;
+
+use Error;
+use file::*;
 use util::*;
 
 #[derive(Debug)]
@@ -63,8 +64,8 @@ impl From<Perm> for Prot {
 pub trait MapExt {
     type MapSpec;
 
-    fn map(&self, perm: Perm, seg: Self::MapSpec) -> Result<Map, OsErr>;
-    unsafe fn map_at(&self, loc: *mut u8, perm: Perm, seg: Self::MapSpec) -> Result<Map, OsErr>;
+    fn map(&self, perm: Perm, seg: Self::MapSpec) -> Result<Map, Error>;
+    unsafe fn map_at(&self, loc: *mut u8, perm: Perm, seg: Self::MapSpec) -> Result<Map, Error>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -74,32 +75,32 @@ impl MapExt for File {
     type MapSpec = Option<Segment>;
 
     #[inline]
-    fn map(&self, perm: Perm, seg: Option<Segment>) -> Result<Map, OsErr> {
+    fn map(&self, perm: Perm, seg: Option<Segment>) -> Result<Map, Error> {
         unsafe { do_map_file(self, ptr::null_mut(), perm, seg) }
     }
 
     #[inline]
     unsafe fn map_at(&self, loc: *mut u8, perm: Perm, seg: Option<Segment>) ->
-      Result<Map, OsErr> { do_map_file(self, loc, perm, seg) }
+      Result<Map, Error> { do_map_file(self, loc, perm, seg) }
 }
 
 impl MapExt for () {
     type MapSpec = usize;
 
     #[inline]
-    fn map(&self, perm: Perm, length: usize) -> Result<Map, OsErr> {
+    fn map(&self, perm: Perm, length: usize) -> Result<Map, Error> {
         unsafe { do_map(-1, ptr::null_mut(), perm, 0, length) }
     }
 
     #[inline]
-    unsafe fn map_at(&self, loc: *mut u8, perm: Perm, length: usize) -> Result<Map, OsErr> {
+    unsafe fn map_at(&self, loc: *mut u8, perm: Perm, length: usize) -> Result<Map, Error> {
         do_map(-1, loc, perm, 0, length)
     }
 }
 
 #[inline]
 unsafe fn do_map_file(f: &File, loc: *mut u8, perm: Perm, seg: Option<Segment>) ->
-  Result<Map, OsErr> {
+  Result<Map, Error> {
     let Segment { offset, length } = seg.unwrap_or(Segment {
         offset: 0, length: try_to_usize(f.stat()?.size as _)?
     });
@@ -108,10 +109,10 @@ unsafe fn do_map_file(f: &File, loc: *mut u8, perm: Perm, seg: Option<Segment>) 
 
 #[inline]
 unsafe fn do_map(fd: isize, loc: *mut u8, perm: Perm, offset: u64, length: usize) ->
-  Result<Map, OsErr> {
+  Result<Map, Error> {
     let ptr = syscall!(MMAP, loc, length, Prot::from(perm).bits,
                        if loc.is_null() { 0 } else { libc::MAP_FIXED }, fd, offset) as *mut u8;
     if (ptr as usize) > 0x1000usize.wrapping_neg() {
-        Err(OsErr::from(NonZeroUsize::new_unchecked((ptr as usize).wrapping_neg())))
+        Err(Error::from(NonZeroUsize::new_unchecked((ptr as usize).wrapping_neg())))
     } else { Ok(Map { ptr: ptr as *mut u8, length }) }
 }

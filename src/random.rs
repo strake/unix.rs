@@ -2,6 +2,8 @@ use core::{mem, slice};
 
 use rand::{CryptoRng, RngCore};
 
+use Error;
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct OsRandom(());
 
@@ -56,10 +58,10 @@ fn try_fill_bytes_linux(bs: &mut [u8], block: bool) -> Result<(), ::rand::Error>
     let mut l = bs.len() as isize;
     while l > 0 { unsafe {
         match esyscall!(GETRANDOM, p, l, if block { 0 } else { ::libc::GRND_NONBLOCK }) {
-            Err(::err::EINTR)  => continue,
-            Err(::err::ENOSYS) =>
+            Err(Error::EINTR)  => continue,
+            Err(Error::ENOSYS) =>
                       return Err(::rand::Error::new(::rand::ErrorKind::Unavailable, "")),
-            Err(::err::EAGAIN) =>
+            Err(Error::EAGAIN) =>
                       return Err(::rand::Error::new(::rand::ErrorKind::NotReady, "")),
             Err(e) => return Err(::rand::Error::new(::rand::ErrorKind::Unexpected, e.message())),
             Ok(n) => {

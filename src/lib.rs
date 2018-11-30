@@ -19,14 +19,31 @@ extern crate time as tempus;
 extern crate void;
 
 #[macro_use]
-pub mod err;
-pub mod env;
+mod err_;
+mod env_;
+
 pub mod file;
 pub mod poll;
 pub mod process;
 pub mod mem;
-pub mod str { pub type OsStr = ::null_terminated::Nul<u8>; }
 pub mod time;
 
 mod random;
 mod util;
+
+pub use err_::Error;
+pub use env_::{Environ, environ};
+pub use file::File;
+pub type Str = ::null_terminated::Nul<u8>;
+
+#[deprecated(note = "Use associated constants of `Error`")]
+pub mod err {
+    pub use Error as OsErr;
+    include!(concat!(env!("OUT_DIR"), "/error_consts.rs"));
+}
+
+#[deprecated]
+pub mod env { pub use env_::*; }
+
+#[deprecated]
+pub mod str { pub use Str as OsStr; }

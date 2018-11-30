@@ -9,8 +9,7 @@ use io::*;
 use rand::*;
 use void::Void;
 
-use err::*;
-use str::*;
+use {Error, Str};
 use time::*;
 use util::*;
 
@@ -21,37 +20,37 @@ pub struct File {
 
 impl File {
     #[inline]
-    pub fn chmod(&self, mode: FileMode) -> Result<(), OsErr> {
+    pub fn chmod(&self, mode: FileMode) -> Result<(), Error> {
         unsafe { esyscall_!(FCHMOD, self.fd, mode.bits) }
     }
 
     #[inline]
-    pub fn stat(&self) -> Result<Stat, OsErr> { unsafe {
+    pub fn stat(&self) -> Result<Stat, Error> { unsafe {
         let mut st: libc::stat = mem::uninitialized();
         try!(esyscall!(FSTAT, self.fd, &mut st as *mut _));
         Ok(Stat::from(st))
     } }
 
     #[inline]
-    pub fn sync(&self, metadata: bool) -> Result<(), OsErr> {
+    pub fn sync(&self, metadata: bool) -> Result<(), Error> {
         unsafe { if !metadata { esyscall_!(FDATASYNC, self.fd) }
                  else         { esyscall_!(FSYNC,     self.fd) } }
     }
 
     #[inline]
-    pub fn truncate(&self, length: u64) -> Result<(), OsErr> {
+    pub fn truncate(&self, length: u64) -> Result<(), Error> {
         unsafe { esyscall_!(FTRUNCATE, self.fd, try_to_usize(length)?) }
     }
 
     #[cfg(target_os = "linux")]
     #[inline]
-    pub fn exec(&self, argv: &Nul<&OsStr>, envp: &Nul<&OsStr>) -> Result<Void, OsErr> {
+    pub fn exec(&self, argv: &Nul<&Str>, envp: &Nul<&Str>) -> Result<Void, Error> {
         exec_at(Some(self), str0!(""), argv, envp, AtFlags::Follow)
     }
 
     #[cfg(not(target_os = "linux"))]
     #[inline]
-    pub fn exec(&self, argv: &Nul<&OsStr>, envp: &Nul<&OsStr>) -> Result<Void, OsErr> {
+    pub fn exec(&self, argv: &Nul<&Str>, envp: &Nul<&Str>) -> Result<Void, Error> {
         unsafe { esyscall!(FEXECVE, self.fd, argv, envp).map(|_| unreach()) }
     }
 
@@ -70,7 +69,7 @@ impl File {
 }
 
 #[inline]
-pub fn new_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { unsafe {
+pub fn new_pipe(flags: OpenFlags) -> Result<(File, File), Error> { unsafe {
     let mut fds: [::libc::c_int; 2] = mem::uninitialized();
     try!(esyscall!(PIPE2, &mut fds as *mut _, flags.bits));
     Ok((File { fd: fds[0] as _ }, File { fd: fds[1] as _ }))
@@ -78,11 +77,11 @@ pub fn new_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { unsafe {
 
 #[deprecated(since = "0.3.0", note = "use `new_pipe`")]
 #[inline]
-pub fn mk_pipe(flags: OpenFlags) -> Result<(File, File), OsErr> { new_pipe(flags) }
+pub fn mk_pipe(flags: OpenFlags) -> Result<(File, File), Error> { new_pipe(flags) }
 
 #[inline]
-pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode,
-                 f_mode: Option<FileMode>) -> Result<File, OsErr> {
+pub fn open_at(opt_dir: Option<&File>, path: &Str, o_mode: OpenMode,
+                 f_mode: Option<FileMode>) -> Result<File, Error> {
     unsafe { match f_mode {
         None => esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(), o_mode.0),
         Some(f_mode) => esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(),
@@ -91,16 +90,16 @@ pub fn open_at(opt_dir: Option<&File>, path: &OsStr, o_mode: OpenMode,
 }
 
 #[inline]
-pub fn rename_at(opt_old_dir: Option<&File>, old_path: &OsStr,
-                 opt_new_dir: Option<&File>, new_path: &OsStr) -> Result<(), OsErr> {
+pub fn rename_at(opt_old_dir: Option<&File>, old_path: &Str,
+                 opt_new_dir: Option<&File>, new_path: &Str) -> Result<(), Error> {
     unsafe { esyscall_!(RENAMEAT, from_opt_dir(opt_old_dir), old_path.as_ptr(),
                                   from_opt_dir(opt_new_dir), new_path.as_ptr()) }
 }
 
 #[inline]
-pub fn link_at(opt_old_dir: Option<&File>, old_path: &OsStr,
-               opt_new_dir: Option<&File>, new_path: &OsStr,
-               at_flags: AtFlags) -> Result<(), OsErr> {
+pub fn link_at(opt_old_dir: Option<&File>, old_path: &Str,
+               opt_new_dir: Option<&File>, new_path: &Str,
+               at_flags: AtFlags) -> Result<(), Error> {
     unsafe { esyscall_!(LINKAT, from_opt_dir(opt_old_dir), old_path.as_ptr(),
                                 from_opt_dir(opt_new_dir), new_path.as_ptr(),
                         if at_flags.contains(AtFlags::Follow) { ::libc::AT_SYMLINK_FOLLOW }
@@ -108,21 +107,21 @@ pub fn link_at(opt_old_dir: Option<&File>, old_path: &OsStr,
 }
 
 #[inline]
-pub fn unlink_at(opt_dir: Option<&File>, path: &OsStr) -> Result<(), OsErr> {
+pub fn unlink_at(opt_dir: Option<&File>, path: &Str) -> Result<(), Error> {
     unsafe { esyscall_!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr(), 0) }
 }
 
 #[inline]
-pub fn chmod_at(opt_dir: Option<&File>, path: &OsStr,
-                mode: FileMode, at_flags: AtFlags) -> Result<(), OsErr> {
+pub fn chmod_at(opt_dir: Option<&File>, path: &Str,
+                mode: FileMode, at_flags: AtFlags) -> Result<(), Error> {
     unsafe { esyscall_!(FCHMODAT, from_opt_dir(opt_dir), path.as_ptr(), mode.bits,
                         if at_flags.contains(AtFlags::Follow) { 0 }
                         else { libc::AT_SYMLINK_NOFOLLOW }) }
 }
 
 #[inline]
-pub fn stat_at(opt_dir: Option<&File>, path: &OsStr,
-               at_flags: AtFlags) -> Result<Stat, OsErr> { unsafe {
+pub fn stat_at(opt_dir: Option<&File>, path: &Str,
+               at_flags: AtFlags) -> Result<Stat, Error> { unsafe {
     let fl = if at_flags.contains(AtFlags::Follow) { 0 } else { libc::AT_SYMLINK_NOFOLLOW }
            | AT_EMPTY_PATH;
     let fd = from_opt_dir(opt_dir);
@@ -138,8 +137,8 @@ pub fn stat_at(opt_dir: Option<&File>, path: &OsStr,
 
 #[cfg(target_os = "linux")]
 #[inline]
-pub fn exec_at(opt_dir: Option<&File>, path: &OsStr,
-               argv: &Nul<&OsStr>, env: &Nul<&OsStr>, at_flags: AtFlags) -> Result<Void, OsErr> {
+pub fn exec_at(opt_dir: Option<&File>, path: &Str,
+               argv: &Nul<&Str>, env: &Nul<&Str>, at_flags: AtFlags) -> Result<Void, Error> {
     unsafe { esyscall!(EXECVEAT, from_opt_dir(opt_dir), path.as_ptr(),
                        argv.as_ptr(), env.as_ptr(),
                        if at_flags.contains(AtFlags::Follow) { 0 }
@@ -155,17 +154,17 @@ fn from_opt_dir(opt_dir: Option<&File>) -> isize {
 }
 
 pub fn mktemp_at<R: Clone, TheRng: Rng>
-  (opt_dir: Option<&File>, templ: &mut OsStr, range: R, rng: &mut TheRng, flags: OpenFlags) ->
-  Result<File, OsErr> where [u8]: IndexMut<R, Output = [u8]> {
+  (opt_dir: Option<&File>, templ: &mut Str, range: R, rng: &mut TheRng, flags: OpenFlags) ->
+  Result<File, Error> where [u8]: IndexMut<R, Output = [u8]> {
     let tries = 0x100;
     for _ in 0..tries {
         randname(rng, &mut templ[range.clone()]);
         match open_at(opt_dir, templ, OpenMode::RdWr | flags | O_EXCL, Some(Perm::Read << USR)) {
-            Err(EEXIST) => (),
+            Err(Error::EEXIST) => (),
             r_f => return r_f,
         }
     }
-    Err(EEXIST)
+    Err(Error::EEXIST)
 }
 
 #[inline]
@@ -187,18 +186,18 @@ pub enum Clobber {
 
 pub use self::Clobber::*;
 
-pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
-  (opt_dir: Option<&File>, path: &OsStr,
-   clobber: Clobber, mode: FileMode, writer: F) -> Result<T, OsErr> {
+pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, Error>, T>
+  (opt_dir: Option<&File>, path: &Str,
+   clobber: Clobber, mode: FileMode, writer: F) -> Result<T, Error> {
     let mut rng = ::rand::rngs::SmallRng::from_rng(::random::OsRandom::new())
-        .map_err(|_| ::err::EIO)?;
+        .map_err(|_| Error::EIO)?;
 
     let mut temp_path = [b' '; 13];
     { let l = temp_path.len(); temp_path[l - 1] = 0; }
-    let temp_path_ref = <&mut OsStr>::try_from(&mut temp_path[..]).unwrap();
+    let temp_path_ref = <&mut Str>::try_from(&mut temp_path[..]).unwrap();
     let f = try!(mktemp_at(opt_dir, temp_path_ref, 0..12, &mut rng, OpenFlags::empty()));
 
-    struct Rm<'a, 'b> { opt_dir: Option<&'a File>, path: &'b OsStr };
+    struct Rm<'a, 'b> { opt_dir: Option<&'a File>, path: &'b Str };
     impl<'a, 'b> Drop for Rm<'a, 'b> {
         #[inline]
         fn drop(&mut self) { unlink_at(self.opt_dir, self.path).unwrap_or(()) }
@@ -209,7 +208,7 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
         NoClobber | Clobber => mode,
         ClobberSavingPerms => match stat_at(opt_dir, path, AtFlags::empty()) {
             Ok(st) => st.mode,
-            Err(::err::ENOENT) => mode,
+            Err(Error::ENOENT) => mode,
             Err(e) => return Err(e),
         },
     }));
@@ -227,13 +226,13 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, OsErr>, T>
 }
 
 impl TryClone for File {
-    type Error = OsErr;
+    type Error = Error;
     #[inline]
-    fn try_clone(&self) -> Result<Self, OsErr> {
+    fn try_clone(&self) -> Result<Self, Error> {
         unsafe { esyscall!(DUP, self.fd) }.map(|fd| File { fd: fd as _ })
     }
     #[inline]
-    fn try_clone_from(&mut self, other: &Self) -> Result<(), OsErr> {
+    fn try_clone_from(&mut self, other: &Self) -> Result<(), Error> {
         unsafe { esyscall_!(DUP2, other.fd, self.fd) }
     }
 }
@@ -244,7 +243,7 @@ impl Drop for File {
 }
 
 impl Read<u8> for File {
-    type Err = OsErr;
+    type Err = Error;
 
     #[inline]
     fn readv(&mut self, bufs: &mut [&mut [u8]]) -> Result<usize, Self::Err> {
@@ -253,7 +252,7 @@ impl Read<u8> for File {
 }
 
 impl Write<u8> for File {
-    type Err = OsErr;
+    type Err = Error;
 
     #[inline]
     fn writev(&mut self, bufs: &[&[u8]]) -> Result<usize, Self::Err> {

@@ -1,5 +1,5 @@
+use Error;
 use file::*;
-use err::*;
 use tempus::Span;
 
 #[derive(Debug, Clone, Copy)]
@@ -31,15 +31,15 @@ bitflags! {
 }
 
 pub trait PollExt {
-    fn poll(&mut self, t: Option<Span>) -> Result<usize, OsErr>;
+    fn poll(&mut self, t: Option<Span>) -> Result<usize, Error>;
 }
 
 impl PollExt for [Poll] {
     #[inline]
-    fn poll(&mut self, t: Option<Span>) -> Result<usize, OsErr> {
+    fn poll(&mut self, t: Option<Span>) -> Result<usize, Error> {
         let t = match t {
             None => None,
-            Some(t) => Some(t.to_c_timespec().ok_or(ERANGE)?),
+            Some(t) => Some(t.to_c_timespec().ok_or(Error::ERANGE)?),
         };
         unsafe { esyscall!(POLL, self.as_ptr(), self.len(), t.as_ref().map_or(::core::ptr::null(), |p| p as *const _), 0) }
     }
