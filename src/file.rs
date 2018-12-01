@@ -187,7 +187,7 @@ pub fn exec_at(opt_dir: Option<&File>, path: &Str,
 }
 
 #[inline]
-fn from_opt_dir(opt_dir: Option<&File>) -> isize {
+pub(crate) fn from_opt_dir(opt_dir: Option<&File>) -> isize {
     match opt_dir {
         None => libc::AT_FDCWD as isize,
         Some(dir) => dir.fd,
@@ -201,12 +201,19 @@ fn from_opt_dir(opt_dir: Option<&File>) -> isize {
 pub fn mktemp_at<R: Clone, TheRng: Rng>
   (opt_dir: Option<&File>, templ: &mut Str, range: R, rng: &mut TheRng, flags: OpenFlags) ->
   Result<File, Error> where [u8]: IndexMut<R, Output = [u8]> {
+    mktemp_helper(|path| open_at(opt_dir, path, OpenMode::RdWr | flags | O_EXCL, Some((Perm::Read | Perm::Write) << USR)),
+                  templ, range, rng)
+}
+
+pub(crate) fn mktemp_helper<R: Clone, TheRng: Rng, F: Fn(&Str) -> Result<A, Error>, A>
+  (f: F, templ: &mut Str, range: R, rng: &mut TheRng) -> Result<A, Error>
+  where [u8]: IndexMut<R, Output = [u8]> {
     let tries = 0x100;
     for _ in 0..tries {
         randname(rng, &mut templ[range.clone()]);
-        match open_at(opt_dir, templ, OpenMode::RdWr | flags | O_EXCL, Some((Perm::Read | Perm::Write) << USR)) {
+        match f(templ) {
             Err(Error::EEXIST) => (),
-            r_f => return r_f,
+            r => return r,
         }
     }
     Err(Error::EEXIST)

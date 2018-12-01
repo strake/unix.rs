@@ -25,6 +25,7 @@ extern crate void;
 mod err_;
 mod env_;
 
+pub mod dir;
 pub mod file;
 pub mod poll;
 pub mod process;
