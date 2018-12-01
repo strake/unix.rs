@@ -1,3 +1,9 @@
+//! File and filesystem operations
+//!
+//! Many functions here which take a path also take an `opt_dir` argument of type `Option<&File>`.
+//! If the path is relative, it is interpreted relative to `opt_dir` if it is `Some`, else the current working directory.
+//! Such functions are marked with an `_at` suffix.
+
 use core::fmt;
 use core::hint::unreachable_unchecked as unreach;
 use core::mem;
@@ -13,17 +19,20 @@ use {Error, Str};
 use time::*;
 use util::*;
 
+/// File descriptor, closed on drop
 #[derive(Debug)]
 pub struct File {
     fd: isize
 }
 
 impl File {
+    /// Change the mode of the file.
     #[inline]
     pub fn chmod(&self, mode: FileMode) -> Result<(), Error> {
         unsafe { esyscall_!(FCHMOD, self.fd, mode.bits) }
     }
 
+    /// Return information about the file.
     #[inline]
     pub fn stat(&self) -> Result<Stat, Error> { unsafe {
         let mut st: libc::stat = mem::uninitialized();
@@ -31,32 +40,47 @@ impl File {
         Ok(Stat::from(st))
     } }
 
+    /// Flush all cached modifications of the file to the device.
+    /// If `metadata`, also flush modifications of the metadata.
     #[inline]
     pub fn sync(&self, metadata: bool) -> Result<(), Error> {
         unsafe { if !metadata { esyscall_!(FDATASYNC, self.fd) }
                  else         { esyscall_!(FSYNC,     self.fd) } }
     }
 
+    /// Truncate the file to the given length.
     #[inline]
     pub fn truncate(&self, length: u64) -> Result<(), Error> {
         unsafe { esyscall_!(FTRUNCATE, self.fd, try_to_usize(length)?) }
     }
 
+    /// Execute the program file.
+    ///
+    /// The current program of the calling process is replaced with the new one, with a fresh stack, heap, and data segment.
+    /// `argv` is an array of argument strings to pass to the new program. By convention, the first should be the name of the program file.
+    /// `env` is an array of strings, conventionally of form "key=value", which are passed as the environment.
     #[cfg(target_os = "linux")]
     #[inline]
     pub fn exec(&self, argv: &Nul<&Str>, envp: &Nul<&Str>) -> Result<Void, Error> {
         exec_at(Some(self), str0!(""), argv, envp, AtFlags::Follow)
     }
 
+    /// Execute the program file.
+    ///
+    /// The current program of the calling process is replaced with the new one, with a fresh stack, heap, and data segment.
+    /// `argv` is an array of argument strings to pass to the new program. By convention, the first should be the name of the program file.
+    /// `env` is an array of strings, conventionally of form "key=value", which are passed as the environment.
     #[cfg(not(target_os = "linux"))]
     #[inline]
     pub fn exec(&self, argv: &Nul<&Str>, envp: &Nul<&Str>) -> Result<Void, Error> {
         unsafe { esyscall!(FEXECVE, self.fd, argv, envp).map(|_| unreach()) }
     }
 
+    /// Return the file descriptor of the `File`.
     #[inline]
     pub fn fd(&self) -> isize { self.fd }
 
+    /// Make a `File` of a file descriptor, which is checked for validity.
     #[inline]
     pub fn new(fd: isize) -> Option<Self> {
         if unsafe {
@@ -64,10 +88,14 @@ impl File {
         } >= 0 { Some(File { fd }) } else { None }
     }
 
+    /// Make a `File` of a file descriptor, which is not checked.
     #[inline]
     pub const fn new_unchecked(fd: isize) -> Self { File { fd } }
 }
 
+/// Return the ends `(rx, tx)` of a new pipe. Data written to `tx` can be read from `rx`.
+///
+/// The reverse may also be true on some systems, but this behavior is not portable.
 #[inline]
 pub fn new_pipe(flags: OpenFlags) -> Result<(File, File), Error> { unsafe {
     let mut fds: [::libc::c_int; 2] = mem::uninitialized();
@@ -75,10 +103,11 @@ pub fn new_pipe(flags: OpenFlags) -> Result<(File, File), Error> { unsafe {
     Ok((File { fd: fds[0] as _ }, File { fd: fds[1] as _ }))
 } }
 
+#[allow(missing_docs)]
 #[deprecated(since = "0.3.0", note = "use `new_pipe`")]
-#[inline]
-pub fn mk_pipe(flags: OpenFlags) -> Result<(File, File), Error> { new_pipe(flags) }
+pub use self::new_pipe as mk_pipe;
 
+/// Open the file at the given path, creating it if `f_mode` is `Some` and it isn't already there.
 #[inline]
 pub fn open_at(opt_dir: Option<&File>, path: &Str, o_mode: OpenMode,
                  f_mode: Option<FileMode>) -> Result<File, Error> {
@@ -89,6 +118,7 @@ pub fn open_at(opt_dir: Option<&File>, path: &Str, o_mode: OpenMode,
     } }.map(|fd| File { fd: fd as isize })
 }
 
+/// Rename the file from `old_path` to `new_path`.
 #[inline]
 pub fn rename_at(opt_old_dir: Option<&File>, old_path: &Str,
                  opt_new_dir: Option<&File>, new_path: &Str) -> Result<(), Error> {
@@ -96,6 +126,7 @@ pub fn rename_at(opt_old_dir: Option<&File>, old_path: &Str,
                                   from_opt_dir(opt_new_dir), new_path.as_ptr()) }
 }
 
+/// Link the file from `old_path` to `new_path`.
 #[inline]
 pub fn link_at(opt_old_dir: Option<&File>, old_path: &Str,
                opt_new_dir: Option<&File>, new_path: &Str,
@@ -106,11 +137,15 @@ pub fn link_at(opt_old_dir: Option<&File>, old_path: &Str,
                         else { 0 } | AT_EMPTY_PATH) }
 }
 
+/// Unlink the file at `path`.
+///
+/// (If it was the last link, the file will likely be deleted once the last open file descriptor to it is closed.)
 #[inline]
 pub fn unlink_at(opt_dir: Option<&File>, path: &Str) -> Result<(), Error> {
     unsafe { esyscall_!(UNLINKAT, from_opt_dir(opt_dir), path.as_ptr(), 0) }
 }
 
+/// Change the mode of the file at `path`.
 #[inline]
 pub fn chmod_at(opt_dir: Option<&File>, path: &Str,
                 mode: FileMode, at_flags: AtFlags) -> Result<(), Error> {
@@ -119,6 +154,7 @@ pub fn chmod_at(opt_dir: Option<&File>, path: &Str,
                         else { libc::AT_SYMLINK_NOFOLLOW }) }
 }
 
+/// Return information about the file at `path`.
 #[inline]
 pub fn stat_at(opt_dir: Option<&File>, path: &Str,
                at_flags: AtFlags) -> Result<Stat, Error> { unsafe {
@@ -135,6 +171,11 @@ pub fn stat_at(opt_dir: Option<&File>, path: &Str,
     Ok(Stat::from(st))
 } }
 
+/// Execute the program file at `path`.
+///
+/// The current program of the calling process is replaced with the new one, with a fresh stack, heap, and data segment.
+/// `argv` is an array of argument strings to pass to the new program. By convention, the first should be the name of the program file.
+/// `env` is an array of strings, conventionally of form "key=value", which are passed as the environment.
 #[cfg(target_os = "linux")]
 #[inline]
 pub fn exec_at(opt_dir: Option<&File>, path: &Str,
@@ -153,6 +194,10 @@ fn from_opt_dir(opt_dir: Option<&File>) -> isize {
     }
 }
 
+/// Generate a unique temporary file name in `templ`, and create and open a file there.
+///
+/// The given `range` of `templ` will be replaced with a string which uniquifies the file name. The contents of `range` after the call are unspecified.
+/// The file is created with mode 600 and opened with `O_EXCL`, which ensures the caller created it.
 pub fn mktemp_at<R: Clone, TheRng: Rng>
   (opt_dir: Option<&File>, templ: &mut Str, range: R, rng: &mut TheRng, flags: OpenFlags) ->
   Result<File, Error> where [u8]: IndexMut<R, Output = [u8]> {
@@ -176,15 +221,19 @@ fn randname<TheRng: Rng>(rng: &mut TheRng, bs: &mut [u8]) {
     }
 }
 
+/// Specify what to do if there is already a file at `path`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Clobber {
-    NoClobber,
-    Clobber,
-    ClobberSavingPerms,
+    /** Abort the operation.                               */ NoClobber,
+    /** Clobber the extant file and its permissions.       */ Clobber,
+    /** Clobber the extant file, but keep its permissions. */ ClobberSavingPerms,
 }
 
 pub use self::Clobber::*;
 
+/// Atomically write the file at the given `path`:
+///
+/// call the given `writer`, and only once it finishes (and not fails), atomically replace the file with a newly-written one.
 pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, Error>, T>
   (opt_dir: Option<&File>, path: &Str,
    clobber: Clobber, mode: FileMode, writer: F) -> Result<T, Error> {
@@ -270,29 +319,34 @@ impl fmt::Write for File {
 }
 
 bitflags! {
+    /// File mode
     pub struct FileMode: u16 {
+        /// Set-user-ID flag: if a process `exec`s the file, set its effective user ID to that of the file's owner.
         const SUID = 0o4000;
+        /// Set-group-ID flag: If a process `exec`s the file, set its effective group ID to that of the file's owner.
         const SGID = 0o2000;
+        /// Sticky bit
         const SVTX = 0o1000;
         #[doc(hidden)]
         const ____ = 0o0777;
     }
 }
 
-bitflags! {
+#[allow(missing_docs)]
+mod file_permission { bitflags! {
     pub struct FilePermission: u8 {
         const Read  = 4;
         const Write = 2;
         const Exec  = 1;
     }
-}
+} } pub use self::file_permission::*;
 pub(crate) use self::FilePermission as Perm;
 
 impl Shl<FileModeSection> for FilePermission {
     type Output = FileMode;
     #[inline]
     fn shl(self, sect: FileModeSection) -> FileMode {
-        FileMode::from_bits_truncate((self.bits as u16) << sect.pos())
+        FileMode::from_bits_truncate((self.bits() as u16) << sect.pos())
     }
 }
 
@@ -304,8 +358,13 @@ impl Shr<FileModeSection> for FileMode {
     }
 }
 
+/// Which agent has the permissions
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum FileModeSection { USR, GRP, OTH }
+pub enum FileModeSection {
+    /** Owning user  */ USR,
+    /** Owning group */ GRP,
+    /** All others   */ OTH,
+}
 pub use self::FileModeSection::*;
 
 impl FileModeSection {
@@ -313,14 +372,15 @@ impl FileModeSection {
     fn pos(self) -> u32 { match self { USR => 6, GRP => 3, OTH => 0 } }
 }
 
+/// Whether to open a file for reading or writing
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OpenMode(usize);
 
 impl OpenMode {
-    pub const RdOnly: Self = OpenMode(libc::O_RDONLY as _);
-    pub const WrOnly: Self = OpenMode(libc::O_WRONLY as _);
-    pub const RdWr  : Self = OpenMode(libc::O_RDWR   as _);
+    /** Read-only  */ pub const RdOnly: Self = OpenMode(libc::O_RDONLY as _);
+    /** Write-only */ pub const WrOnly: Self = OpenMode(libc::O_WRONLY as _);
+    /** Read-write */ pub const RdWr  : Self = OpenMode(libc::O_RDWR   as _);
 }
 
 impl BitOr<OpenFlags> for OpenMode {
@@ -357,38 +417,49 @@ impl BitXorAssign<OpenFlags> for OpenMode {
 }
 
 bitflags! {
+    /// File creation and status flags
     pub struct OpenFlags: usize {
+        /// Set the close-on-exec flag on the returned file descriptor.
         const O_CLOEXEC  = libc::O_CLOEXEC  as usize;
+        /// Ensure the call creates the file; if the file already is, the system call fails with
+        /// [`EEXIST`](../struct.Error.html#associatedconstant.EEXIST).
         const O_EXCL     = libc::O_EXCL     as usize;
+        /// Open the file in non-blocking mode: operations which would block rather return
+        /// [`EAGAIN`](../struct.Error.html#associatedconstant.EAGAIN) or
+        /// [`EWOULDBLOCK`](../struct.Error.html#associatedconstant.EWOULDBLOCK).
         const O_NONBLOCK = libc::O_NONBLOCK as usize;
+        /// The file will not become the caller's controlling TTY, even if the file is a TTY and the process has none already.
         const O_NOCTTY   = libc::O_NOCTTY   as usize;
     }
 }
-pub const O_CLOEXEC : OpenFlags = OpenFlags::O_CLOEXEC;
-pub const O_EXCL    : OpenFlags = OpenFlags::O_EXCL;
-pub const O_NONBLOCK: OpenFlags = OpenFlags::O_NONBLOCK;
-pub const O_NOCTTY  : OpenFlags = OpenFlags::O_NOCTTY;
+#[allow(missing_docs)] pub const O_CLOEXEC : OpenFlags = OpenFlags::O_CLOEXEC;
+#[allow(missing_docs)] pub const O_EXCL    : OpenFlags = OpenFlags::O_EXCL;
+#[allow(missing_docs)] pub const O_NONBLOCK: OpenFlags = OpenFlags::O_NONBLOCK;
+#[allow(missing_docs)] pub const O_NOCTTY  : OpenFlags = OpenFlags::O_NOCTTY;
 
 bitflags! {
+    /// Flags modifying behavior of file operations
     pub struct AtFlags: usize {
+        /// Follow symbolic links
         const Follow = libc::AT_SYMLINK_FOLLOW as usize;
     }
 }
 
+/// File information
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Stat {
-    pub dev:     libc::dev_t,
-    pub ino:     libc::ino_t,
-    pub mode:    FileMode,
-    pub nlink:   libc::nlink_t,
-    pub uid:     libc::uid_t,
-    pub gid:     libc::gid_t,
-    pub size:    libc::off_t,
-    pub blksize: libc::blksize_t,
-    pub blocks:  libc::blkcnt_t,
-    pub atime:   EpochTime,
-    pub mtime:   EpochTime,
-    pub ctime:   EpochTime,
+    /** ID of device containing file  */ pub dev:     libc::dev_t,
+    /** Inode number                  */ pub ino:     libc::ino_t,
+    /** File type and mode            */ pub mode:    FileMode,
+    /** Number of links               */ pub nlink:   libc::nlink_t,
+    /** User ID of owner              */ pub uid:     libc::uid_t,
+    /** Group ID of owner             */ pub gid:     libc::gid_t,
+    /** Total size, in bytes          */ pub size:    libc::off_t,
+    /** Block size for filesystem I/O */ pub blksize: libc::blksize_t,
+    /** Number of allocated blocks    */ pub blocks:  libc::blkcnt_t,
+    /** Time of last access           */ pub atime:   EpochTime,
+    /** Time of last modification     */ pub mtime:   EpochTime,
+    /** Time of last status change    */ pub ctime:   EpochTime,
 }
 
 impl From<libc::stat> for Stat {

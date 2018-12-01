@@ -1,11 +1,17 @@
+//! Temporal types and operations
+
 use core::{mem, ops::*};
 use idem::Zero;
 use tempus::Span;
 
+/// Time measured since the Unix epoch
+///
+/// The Unix epoch = Julian date 2440587.5 = Gregorian date January 1st 1970 00:00 UTC
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EpochTime(i128);
 
 impl EpochTime {
+    /// Return the present time.
     #[inline]
     pub fn now() -> Self { unsafe {
         let mut t = mem::uninitialized();
@@ -13,9 +19,11 @@ impl EpochTime {
         Self::from_c_timespec(t)
     } }
 
+    /// Convert from nanoseconds since the Unix epoch to an `EpochTime`.
     #[inline]
     pub fn from_ns_since_epoch(n: i128) -> Self { EpochTime(n) }
 
+    /// Convert from an `EpochTime` to nanoseconds since the Unix epoch.
     #[inline]
     pub fn to_ns_since_epoch(self) -> i128 { self.0 }
 
@@ -58,6 +66,11 @@ impl SubAssign<Span> for EpochTime {
     fn sub_assign(&mut self, other: Span) { self.0 -= other.to_ns() }
 }
 
+/// Sleep for the given time span.
+///
+/// # Failures
+///
+/// Returns `Err(remaining_time)` if interrupted.
 #[inline]
 pub fn sleep_for(t: Span) -> Result<(), Span> { unsafe {
     assert!(Span::zero < t);
@@ -67,6 +80,11 @@ pub fn sleep_for(t: Span) -> Result<(), Span> { unsafe {
                &mut rem as *mut _).map_err(|_| rem)
 } }
 
+/// Sleep until the given time point.
+///
+/// # Failures
+///
+/// Returns `Err` if interrupted.
 #[inline]
 pub fn sleep_until(t: EpochTime) -> Result<(), ()> { unsafe {
     esyscall_!(CLOCK_NANOSLEEP, ::libc::CLOCK_REALTIME, ::libc::TIMER_ABSTIME,

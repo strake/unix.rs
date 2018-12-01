@@ -1,3 +1,5 @@
+//! Memory-mapping operations
+
 use core::{mem, num::NonZeroUsize, ops::{Deref, DerefMut}, ptr, slice};
 use libc;
 
@@ -5,6 +7,7 @@ use Error;
 use file::*;
 use util::*;
 
+/// Memory-mapping, unmapped on drop
 #[derive(Debug)]
 pub struct Map {
     ptr: *mut u8,
@@ -12,6 +15,7 @@ pub struct Map {
 }
 
 impl Map {
+    /// Leak the mapping: it will never be unmapped while the calling program is loaded.
     #[inline]
     pub fn leak(self) -> &'static mut [u8] {
         let Map { ptr, length } = self;
@@ -61,15 +65,23 @@ impl From<Perm> for Prot {
     }
 }
 
+/// Values which can be mapped into memory
 pub trait MapExt {
+    /// Specifier of which part of value to map
     type MapSpec;
 
+    /// Map the value into memory at an unspecified location.
     fn map(&self, perm: Perm, seg: Self::MapSpec) -> Result<Map, Error>;
+    /// Map the value into memory at the given location.
     unsafe fn map_at(&self, loc: *mut u8, perm: Perm, seg: Self::MapSpec) -> Result<Map, Error>;
 }
 
+#[allow(missing_docs)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Segment { pub offset: u64, pub length: usize }
+pub struct Segment {
+    pub offset: u64,
+    pub length: usize,
+}
 
 impl MapExt for File {
     type MapSpec = Option<Segment>;

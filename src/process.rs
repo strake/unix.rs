@@ -1,11 +1,15 @@
+//! Process operations
+
 use core::mem;
 pub use libc::id_t as Id;
 
 use Error;
 
+/// Create a new process which is a copy of the calling process.
 #[inline]
 pub fn fork() -> Result<Id, Error> { unsafe { esyscall!(FORK).map(|pid| pid as _) } }
 
+/// Terminate the calling process.
 #[inline]
 pub fn quit(code: isize) -> ! { unsafe {
     #[cfg(target_os = "linux")]
@@ -14,16 +18,25 @@ pub fn quit(code: isize) -> ! { unsafe {
     ::core::intrinsics::abort()
 } }
 
+/// Return the ID of the calling process.
 #[inline]
 pub fn pid() -> Id { unsafe { syscall!(GETPID) as _ } }
+
+/// Return the ID of the parent of the calling process.
 #[inline]
 pub fn ppid() -> Id { unsafe { syscall!(GETPPID) as _ } }
 
+/// Specify which child to wait for
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum WaitSpec { Pid(Id), Gid(Id), All }
+pub enum WaitSpec {
+    /** Wait for the given process              */ Pid(Id),
+    /** Wait for any process in the given group */ Gid(Id),
+    /** Wait for any process                    */ All,
+}
 
 impl WaitSpec {
+    /// Wait for the state of a child process to change, and return information about it.
     #[inline]
     pub fn wait(self, flags: WaitFlags) -> Result<(WaitInfo, ::libc::rusage), Error> {
         unsafe {
@@ -31,7 +44,7 @@ impl WaitSpec {
             let mut si: siginfo = mem::uninitialized();
             let mut ru: ::libc::rusage = mem::uninitialized();
             si.si.pid = 0;
-            esyscall!(WAITID, id_type, id, &mut si as *mut _, flags.bits, &mut ru as *mut _)?;
+            esyscall!(WAITID, id_type, id, &mut si as *mut _, flags.bits(), &mut ru as *mut _)?;
             if 0 == si.si.pid { return Err(Error::EWOULDBLOCK) }
             Ok((WaitInfo::from_c(si.si), ru))
         }
@@ -48,20 +61,25 @@ impl WaitSpec {
     }
 }
 
-bitflags! {
+#[allow(missing_docs)]
+mod wait_flags { bitflags! {
     pub struct WaitFlags: usize {
         const Exit = ::libc::WEXITED as usize;
         const Stop = ::libc::WSTOPPED as usize;
         const Cont = ::libc::WCONTINUED as usize;
+
+        /// Return immediately if no child already changed state.
         const NoHang = ::libc::WNOHANG as usize;
+        /// Return if a child is stopped, even if the child is not traced.
         const NoWait = ::libc::WNOWAIT as usize;
     }
-}
+} } pub use self::wait_flags::WaitFlags;
 
+/// Notice of process termination
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct WaitInfo {
-    pid: Id,
-    code: WaitCode,
+    /** ID of terminated process */     pid: Id,
+    /** Cause of process termination */ code: WaitCode,
     status: isize,
 }
 
@@ -70,16 +88,18 @@ impl WaitInfo {
     unsafe fn from_c(si: siginfo_) -> Self {
         WaitInfo {
             pid: si.pid as _,
-            code: WaitCode::from_c(si.code),
+            code: WaitCode(si.code),
             status: si.status as _,
         }
     }
 }
 
+/// Cause of process termination
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct WaitCode(::libc::c_int);
 
+#[allow(missing_docs)]
 impl WaitCode {
     pub const Exit: Self = WaitCode(1);
     pub const Kill: Self = WaitCode(2);

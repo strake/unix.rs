@@ -1,40 +1,48 @@
+//! I/O multiplexing
+
 use Error;
 use file::*;
 use tempus::Span;
 
+/// Specify what to poll
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct Poll {
-    pub fd: ::libc::c_int,
-    pub ev: Event,
+    /** Which file descriptor to poll */ pub fd: ::libc::c_int,
+    /** Which events to poll          */ pub ev: Event,
     r: Event,
 }
 
 impl Poll {
+    #[allow(missing_docs)]
     #[inline]
     pub fn new(f: &File, ev: Event) -> Self { Poll {
         fd: f.fd() as _, ev, r: Event::empty(),
     } }
 
+    /// Return which events are ready on the file descriptor.
     #[inline]
     pub fn ready(self) -> Event { self.r }
 }
 
 bitflags! {
+    /// Which events to poll
     pub struct Event: ::libc::c_short {
-        const In  = ::libc::POLLIN;
-        const Out = ::libc::POLLOUT;
-        const Pri = ::libc::POLLPRI;
-        const Hup = ::libc::POLLHUP;
-        const Err = ::libc::POLLERR;
+        /** Readable       */ const In  = ::libc::POLLIN;
+        /** Writable       */ const Out = ::libc::POLLOUT;
+        /** Exceptional    */ const Pri = ::libc::POLLPRI;
+        /** Closed/hung-up */ const Hup = ::libc::POLLHUP;
+        /** Erroneous      */ const Err = ::libc::POLLERR;
     }
 }
 
+#[allow(missing_docs)]
 pub trait PollExt {
     fn poll(&mut self, t: Option<Span>) -> Result<usize, Error>;
 }
 
 impl PollExt for [Poll] {
+    /// Poll the given file descriptors for the given events.
     #[inline]
     fn poll(&mut self, t: Option<Span>) -> Result<usize, Error> {
         let t = match t {

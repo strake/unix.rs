@@ -1,6 +1,9 @@
+//! Unix system types and operations
+
 #![no_std]
 
 #![deny(missing_debug_implementations)]
+#![deny(missing_docs)]
 
 #![feature(core_intrinsics)]
 
@@ -34,16 +37,21 @@ mod util;
 pub use err_::Error;
 pub use env_::{Environ, environ};
 pub use file::File;
+
+/// Null-terminated byte string, used in many Unix system interfaces
 pub type Str = ::null_terminated::Nul<u8>;
 
 #[deprecated(note = "Use associated constants of `Error`")]
+#[allow(missing_docs)]
 pub mod err {
     pub use Error as OsErr;
     include!(concat!(env!("OUT_DIR"), "/error_consts.rs"));
 }
 
 #[deprecated]
+#[allow(missing_docs)]
 pub mod env { pub use env_::*; }
 
 #[deprecated]
+#[allow(missing_docs)]
 pub mod str { pub use Str as OsStr; }
