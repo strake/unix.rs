@@ -103,7 +103,6 @@ pub fn new_pipe(flags: OpenFlags) -> Result<(File, File), Error> { unsafe {
     Ok((File { fd: fds[0] as _ }, File { fd: fds[1] as _ }))
 } }
 
-#[allow(missing_docs)]
 #[deprecated(since = "0.3.0", note = "use `new_pipe`")]
 pub use self::new_pipe as mk_pipe;
 
