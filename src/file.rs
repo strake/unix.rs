@@ -204,7 +204,7 @@ pub fn mktemp_at<R: Clone, TheRng: Rng>
     let tries = 0x100;
     for _ in 0..tries {
         randname(rng, &mut templ[range.clone()]);
-        match open_at(opt_dir, templ, OpenMode::RdWr | flags | O_EXCL, Some(Perm::Read << USR)) {
+        match open_at(opt_dir, templ, OpenMode::RdWr | flags | O_EXCL, Some((Perm::Read | Perm::Write) << USR)) {
             Err(Error::EEXIST) => (),
             r_f => return r_f,
         }
