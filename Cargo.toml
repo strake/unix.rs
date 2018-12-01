@@ -5,6 +5,7 @@ authors = ["M Farkas-Dyck <strake888@gmail.com>"]
 description = "Interface to Unix system facilities"
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/unix/"
+repository = "https://github.com/strake/unix.rs"
 
 [dependencies]
 flags = "0.1"
