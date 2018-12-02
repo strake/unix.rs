@@ -33,20 +33,6 @@ impl RngCore for OsRandom {
     fn try_fill_bytes(&mut self, bs: &mut [u8]) -> Result<(), ::rand::Error> {
         try_fill_bytes_getrandom(bs, false)
     }
-
-    #[cfg(target_os = "openbsd")]
-    #[inline]
-    fn fill_bytes(&mut self, bs: &mut [u8]) { self.try_fill_bytes(bs).unwrap() }
-
-    #[cfg(target_os = "openbsd")]
-    #[inline]
-    fn try_fill_bytes(&mut self, bs: &mut [u8]) -> Result<(), ::rand::Error> {
-        for bs in bs.chunks_mut(0x100) {
-            unsafe { esyscall!(GETENTROPY, bs.as_mut_ptr(), bs.len()) }
-                .map_err(|e| ::rand::Error::new(::rand::ErrorKind::Unavailable, e.message()))?
-        }
-        Ok(())
-    }
 }
 
 impl CryptoRng for OsRandom {}
