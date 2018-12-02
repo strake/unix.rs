@@ -43,11 +43,20 @@ impl From<NoMemory> for Error {
 
 include!(concat!(env!("OUT_DIR"), "/e.rs"));
 
+/// Make a system call.
+///
+/// Works like [`syscall`](../syscall/macro.syscall.html) but returns `Err`
+/// if system call returns a negative value.
 #[macro_export]
 macro_rules! esyscall {
     ($n:ident $(, $a:expr)*) =>
         ($crate::Error::from_sysret(syscall!($n $(, $a)*) as isize))
 }
 
+/// Make a system call.
+///
+/// Works like [`esyscall`](macro.esyscall.html) but returns
+/// `Result<(), Error>` rather than `Result<usize, Error>`, that is, it forgets a positive
+/// return value.
 #[macro_export]
 macro_rules! esyscall_ { ($n:ident $(, $a:expr)*) => (esyscall!($n $(, $a)*).map(|_| ())) }
