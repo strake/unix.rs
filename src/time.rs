@@ -87,7 +87,8 @@ pub fn sleep_for(t: Span) -> Result<(), Span> { unsafe {
 /// Returns `Err` if interrupted.
 #[inline]
 pub fn sleep_until(t: EpochTime) -> Result<(), ()> { unsafe {
-    esyscall_!(CLOCK_NANOSLEEP, ::libc::CLOCK_REALTIME, ::libc::TIMER_ABSTIME,
+    const TIMER_ABSTIME: usize = 1;
+    esyscall_!(CLOCK_NANOSLEEP, ::libc::CLOCK_REALTIME, TIMER_ABSTIME,
                &(t - EpochTime(0)).to_c_timespec().expect("timespan too long") as *const _)
         .map_err(|_| ())
 } }

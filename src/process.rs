@@ -41,11 +41,14 @@ impl WaitSpec {
     pub fn wait(self, flags: WaitFlags) -> Result<(WaitInfo, ::libc::rusage), Error> {
         unsafe {
             let (id_type, id) = self.to_wait_args();
-            let mut si: siginfo = mem::uninitialized();
+            let mut si = siginfo_ { u: () };
             let mut ru: ::libc::rusage = mem::uninitialized();
-            si.si.pid = 0;
+            si.si.si_pid = 0;
+            #[cfg(target_os = "linux")]
             esyscall!(WAITID, id_type, id, &mut si as *mut _, flags.bits(), &mut ru as *mut _)?;
-            if 0 == si.si.pid { return Err(Error::EWOULDBLOCK) }
+            #[cfg(target_os = "freebsd")]
+            esyscall!(WAIT6, id_type, id, &mut 0usize as *mut _, flags.bits(), &mut ru as *mut _, &mut si as *mut _)?;
+            if 0 == si.si.si_pid { return Err(Error::EWOULDBLOCK) }
             Ok((WaitInfo::from_c(si.si), ru))
         }
     }
@@ -85,11 +88,11 @@ pub struct WaitInfo {
 
 impl WaitInfo {
     #[inline]
-    unsafe fn from_c(si: siginfo_) -> Self {
+    unsafe fn from_c(si: siginfo) -> Self {
         WaitInfo {
-            pid: si.pid as _,
-            code: WaitCode(si.code),
-            status: si.status as _,
+            pid: si.si_pid as _,
+            code: WaitCode(si.si_code),
+            status: si.si_status as _,
         }
     }
 }
@@ -112,18 +115,22 @@ impl WaitCode {
 #[cfg(target_os = "linux")]
 #[repr(C)]
 #[derive(Clone, Copy)]
-struct siginfo_ {
-    signo:  ::libc::c_int,
-    errno:  ::libc::c_int,
-    code:   ::libc::c_int,
-    pid:    ::libc::pid_t,
-    uid:    ::libc::uid_t,
-    value:  ::libc::sigval,
-    status: ::libc::c_int,
+struct siginfo {
+    si_signo:  ::libc::c_int,
+    si_errno:  ::libc::c_int,
+    si_code:   ::libc::c_int,
+    si_pid:    ::libc::pid_t,
+    si_uid:    ::libc::uid_t,
+    si_value:  ::libc::sigval,
+    si_status: ::libc::c_int,
 }
 
+#[cfg(target_os = "freebsd")]
+type siginfo = ::libc::siginfo_t;
+
 #[repr(C)]
-union siginfo {
-    si: siginfo_,
+union siginfo_ {
+    si: siginfo,
     pad: [u8; 0x80],
+    u: (),
 }

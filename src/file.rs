@@ -73,7 +73,7 @@ impl File {
     #[cfg(not(target_os = "linux"))]
     #[inline]
     pub fn exec(&self, argv: &Nul<&Str>, envp: &Nul<&Str>) -> Result<Void, Error> {
-        unsafe { esyscall!(FEXECVE, self.fd, argv, envp).map(|_| unreach()) }
+        unsafe { esyscall!(FEXECVE, self.fd, argv as *const _, envp as *const _).map(|_| unreach()) }
     }
 
     /// Return the file descriptor of the `File`.
