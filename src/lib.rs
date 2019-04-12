@@ -22,7 +22,9 @@ extern crate time as tempus;
 extern crate void;
 
 #[macro_use]
+#[path = "err.rs"]
 mod err_;
+#[path = "env.rs"]
 mod env_;
 
 pub mod dir;
