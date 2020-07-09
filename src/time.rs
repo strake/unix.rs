@@ -1,6 +1,7 @@
 //! Temporal types and operations
 
-use core::{mem, ops::*};
+use core::mem::MaybeUninit as MU;
+use core::ops::*;
 use idem::Zero;
 use tempus::Span;
 
@@ -14,9 +15,9 @@ impl EpochTime {
     /// Return the present time.
     #[inline]
     pub fn now() -> Self { unsafe {
-        let mut t = mem::uninitialized();
-        syscall!(CLOCK_GETTIME, ::libc::CLOCK_REALTIME, &mut t as *mut _);
-        Self::from_c_timespec(t)
+        let mut t = MU::uninit();
+        syscall!(CLOCK_GETTIME, ::libc::CLOCK_REALTIME, t.as_mut_ptr());
+        Self::from_c_timespec(t.assume_init())
     } }
 
     /// Convert from nanoseconds since the Unix epoch to an `EpochTime`.
@@ -74,10 +75,10 @@ impl SubAssign<Span> for EpochTime {
 #[inline]
 pub fn sleep_for(t: Span) -> Result<(), Span> { unsafe {
     assert!(Span::zero < t);
-    let mut rem = mem::uninitialized();
+    let mut rem = MU::uninit();
     esyscall_!(CLOCK_NANOSLEEP, ::libc::CLOCK_MONOTONIC, 0,
                &t.to_c_timespec().expect("timespan too long") as *const _,
-               &mut rem as *mut _).map_err(|_| rem)
+               rem.as_mut_ptr()).map_err(|_| rem.assume_init())
 } }
 
 /// Sleep until the given time point.

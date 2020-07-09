@@ -7,6 +7,7 @@
 use core::fmt;
 use core::hint::unreachable_unchecked as unreach;
 use core::mem;
+use core::mem::MaybeUninit as MU;
 use core::ops::*;
 use fallible::*;
 use libc;
@@ -35,9 +36,9 @@ impl File {
     /// Return information about the file.
     #[inline]
     pub fn stat(&self) -> Result<Stat, Error> { unsafe {
-        let mut st: libc::stat = mem::uninitialized();
-        try!(esyscall!(FSTAT, self.fd, &mut st as *mut _));
-        Ok(Stat::from(st))
+        let mut st = MU::<libc::stat>::uninit();
+        try!(esyscall!(FSTAT, self.fd, st.as_mut_ptr()));
+        Ok(Stat::from(st.assume_init()))
     } }
 
     /// Flush all cached modifications of the file to the device.
@@ -98,7 +99,7 @@ impl File {
 /// The reverse may also be true on some systems, but this behavior is not portable.
 #[inline]
 pub fn new_pipe(flags: OpenFlags) -> Result<(File, File), Error> { unsafe {
-    let mut fds: [::libc::c_int; 2] = mem::uninitialized();
+    let mut fds = MU::<[::libc::c_int; 2]>::uninit().assume_init();
     try!(esyscall!(PIPE2, &mut fds as *mut _, flags.bits));
     Ok((File { fd: fds[0] as _ }, File { fd: fds[1] as _ }))
 } }
@@ -160,14 +161,14 @@ pub fn stat_at(opt_dir: Option<&File>, path: &Str,
     let fl = if at_flags.contains(AtFlags::Follow) { 0 } else { libc::AT_SYMLINK_NOFOLLOW }
            | AT_EMPTY_PATH;
     let fd = from_opt_dir(opt_dir);
-    let mut st: libc::stat = mem::uninitialized();
+    let mut st = MU::<libc::stat>::uninit();
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    try!(esyscall_!(NEWFSTATAT, fd, path.as_ptr(), &mut st as *mut _, fl));
+    try!(esyscall_!(NEWFSTATAT, fd, path.as_ptr(), st.as_mut_ptr(), fl));
     #[cfg(all(target_os = "linux", not(target_arch = "x86_64")))]
-    try!(esyscall_!(FSTATAT64,  fd, path.as_ptr(), &mut st as *mut _, fl));
+    try!(esyscall_!(FSTATAT64,  fd, path.as_ptr(), st.as_mut_ptr(), fl));
     #[cfg(not(target_os = "linux"))]
-    try!(esyscall_!(FSTATAT,    fd, path.as_ptr(), &mut st as *mut _, fl));
-    Ok(Stat::from(st))
+    try!(esyscall_!(FSTATAT,    fd, path.as_ptr(), st.as_mut_ptr(), fl));
+    Ok(Stat::from(st.assume_init()))
 } }
 
 /// Execute the program file at `path`.

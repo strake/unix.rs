@@ -13,10 +13,10 @@ impl OsRandom {
 
     #[inline]
     pub unsafe fn next<T: Copy>(&mut self) -> T {
-        let mut x: T = mem::uninitialized();
+        let mut x = mem::MaybeUninit::<T>::uninit();
         self.fill_bytes(slice::from_raw_parts_mut(&mut x as *mut _ as *mut u8,
                                                   mem::size_of::<T>()));
-        x
+        x.assume_init()
     }
 }
 

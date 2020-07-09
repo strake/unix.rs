@@ -1,6 +1,6 @@
 //! Process operations
 
-use core::mem;
+use core::mem::MaybeUninit as MU;
 pub use libc::id_t as Id;
 
 use Error;
@@ -42,14 +42,14 @@ impl WaitSpec {
         unsafe {
             let (id_type, id) = self.to_wait_args();
             let mut si = siginfo_ { u: () };
-            let mut ru: ::libc::rusage = mem::uninitialized();
+            let mut ru = MU::<::libc::rusage>::uninit();
             si.si.si_pid = 0;
             #[cfg(target_os = "linux")]
-            esyscall!(WAITID, id_type, id, &mut si as *mut _, flags.bits(), &mut ru as *mut _)?;
+            esyscall!(WAITID, id_type, id, &mut si as *mut _, flags.bits(), ru.as_mut_ptr())?;
             #[cfg(target_os = "freebsd")]
-            esyscall!(WAIT6, id_type, id, &mut 0usize as *mut _, flags.bits(), &mut ru as *mut _, &mut si as *mut _)?;
+            esyscall!(WAIT6, id_type, id, &mut 0usize as *mut _, flags.bits(), ru.as_mut_ptr(), &mut si as *mut _)?;
             if 0 == si.si.si_pid { return Err(Error::EWOULDBLOCK) }
-            Ok((WaitInfo::from_c(si.si), ru))
+            Ok((WaitInfo::from_c(si.si), ru.assume_init()))
         }
     }
 
@@ -59,7 +59,7 @@ impl WaitSpec {
         match self {
             Pid(pid) => (::libc::P_PID, pid),
             Gid(gid) => (::libc::P_PGID, gid),
-            All      => (::libc::P_ALL, mem::uninitialized()),
+            All      => (::libc::P_ALL, MU::uninit().assume_init()),
         }
     }
 }
