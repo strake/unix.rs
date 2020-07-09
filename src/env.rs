@@ -1,4 +1,4 @@
-use fallible::TryInto;
+use core::convert::TryInto;
 use null_terminated::{Nul, NulStr};
 
 #[link_name = "__environ"]

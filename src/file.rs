@@ -4,6 +4,7 @@
 //! If the path is relative, it is interpreted relative to `opt_dir` if it is `Some`, else the current working directory.
 //! Such functions are marked with an `_at` suffix.
 
+use core::convert::TryFrom;
 use core::fmt;
 use core::hint::unreachable_unchecked as unreach;
 use core::mem;
