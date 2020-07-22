@@ -38,7 +38,7 @@ impl File {
     #[inline]
     pub fn stat(&self) -> Result<Stat, Error> { unsafe {
         let mut st = MU::<libc::stat>::uninit();
-        try!(esyscall!(FSTAT, self.fd, st.as_mut_ptr()));
+        esyscall!(FSTAT, self.fd, st.as_mut_ptr())?;
         Ok(Stat::from(st.assume_init()))
     } }
 
@@ -101,7 +101,7 @@ impl File {
 #[inline]
 pub fn new_pipe(flags: OpenFlags) -> Result<(File, File), Error> { unsafe {
     let mut fds = MU::<[::libc::c_int; 2]>::uninit().assume_init();
-    try!(esyscall!(PIPE2, &mut fds as *mut _, flags.bits));
+    esyscall!(PIPE2, &mut fds as *mut _, flags.bits)?;
     Ok((File { fd: fds[0] as _ }, File { fd: fds[1] as _ }))
 } }
 
@@ -164,11 +164,11 @@ pub fn stat_at(opt_dir: Option<&File>, path: &Str,
     let fd = from_opt_dir(opt_dir);
     let mut st = MU::<libc::stat>::uninit();
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    try!(esyscall_!(NEWFSTATAT, fd, path.as_ptr(), st.as_mut_ptr(), fl));
+    esyscall_!(NEWFSTATAT, fd, path.as_ptr(), st.as_mut_ptr(), fl)?;
     #[cfg(all(target_os = "linux", not(target_arch = "x86_64")))]
-    try!(esyscall_!(FSTATAT64,  fd, path.as_ptr(), st.as_mut_ptr(), fl));
+    esyscall_!(FSTATAT64,  fd, path.as_ptr(), st.as_mut_ptr(), fl)?;
     #[cfg(not(target_os = "linux"))]
-    try!(esyscall_!(FSTATAT,    fd, path.as_ptr(), st.as_mut_ptr(), fl));
+    esyscall_!(FSTATAT,    fd, path.as_ptr(), st.as_mut_ptr(), fl)?;
     Ok(Stat::from(st.assume_init()))
 } }
 
@@ -251,7 +251,7 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, Error>, T>
     let mut temp_path = [b' '; 13];
     temp_path[temp_path.len() - 1] = 0;
     let temp_path_ref = <&mut Str>::try_from(&mut temp_path[..]).unwrap();
-    let f = try!(mktemp_at(opt_dir, temp_path_ref, 0..12, &mut rng, OpenFlags::empty()));
+    let f = mktemp_at(opt_dir, temp_path_ref, 0..12, &mut rng, OpenFlags::empty())?;
 
     struct Rm<'a, 'b> { opt_dir: Option<&'a File>, path: &'b Str };
     impl<'a, 'b> Drop for Rm<'a, 'b> {
@@ -260,21 +260,21 @@ pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, Error>, T>
     }
     let rm = Rm { opt_dir, path: temp_path_ref };
 
-    try!(f.chmod(match clobber {
+    f.chmod(match clobber {
         NoClobber | Clobber => mode,
         ClobberSavingPerms => match stat_at(opt_dir, path, AtFlags::empty()) {
             Ok(st) => st.mode,
             Err(Error::ENOENT) => mode,
             Err(e) => return Err(e),
         },
-    }));
+    })?;
 
-    let m = try!(writer(f));
+    let m = writer(f)?;
 
     match clobber {
-        NoClobber => try!(link_at(opt_dir, temp_path_ref, opt_dir, path, AtFlags::empty())),
+        NoClobber => link_at(opt_dir, temp_path_ref, opt_dir, path, AtFlags::empty())?,
         Clobber | ClobberSavingPerms => {
-            try!(rename_at(opt_dir, temp_path_ref, opt_dir, path));
+            rename_at(opt_dir, temp_path_ref, opt_dir, path)?;
             mem::forget(rm);
         },
     }
