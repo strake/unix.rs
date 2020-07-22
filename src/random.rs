@@ -1,22 +1,33 @@
+//! Random number generation
+
 use core::{mem, slice};
 
 use rand::{CryptoRng, RngCore};
 
 use Error;
 
+/// Random numbers via system call
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct OsRandom(());
 
 impl OsRandom {
+    #[allow(missing_docs)]
     #[inline]
     pub fn new() -> Self { OsRandom(()) }
 
+    /// Generate a value.
     #[inline]
     pub unsafe fn next<T: Copy>(&mut self) -> T {
+        self.try_next().unwrap()
+    }
+
+    /// Generate a value.
+    #[inline]
+    pub unsafe fn try_next<T: Copy>(&mut self) -> Result<T, ::rand::Error> {
         let mut x = mem::MaybeUninit::<T>::uninit();
-        self.fill_bytes(slice::from_raw_parts_mut(&mut x as *mut _ as *mut u8,
-                                                  mem::size_of::<T>()));
-        x.assume_init()
+        self.try_fill_bytes(slice::from_raw_parts_mut(&mut x as *mut _ as *mut u8,
+                                                      mem::size_of::<T>()))?;
+        Ok(x.assume_init())
     }
 }
 

@@ -29,12 +29,12 @@ mod env_;
 
 pub mod dir;
 pub mod file;
+pub mod mem;
 pub mod poll;
 pub mod process;
-pub mod mem;
+pub mod random;
 pub mod time;
 
-mod random;
 mod util;
 
 pub use err_::Error;
