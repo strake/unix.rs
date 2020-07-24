@@ -1,6 +1,6 @@
 //! Directory operations
 
-use core::ops::IndexMut;
+use core::{convert::TryFrom, fmt, mem, ops::IndexMut, slice};
 use rand::Rng;
 
 use {Error, File, Str};
@@ -20,4 +20,72 @@ pub fn mktemp_at<R: Clone, TheRng: Rng>
   where [u8]: IndexMut<R, Output = [u8]> {
     ::file::mktemp_helper(|path| mkdir_at(opt_dir, path, (Perm::Read | Perm::Write | Perm::Exec) << ::file::FileModeSection::USR),
                           templ, range, rng)
+}
+
+/// Directory entry iterator
+pub struct Entries {
+    file: File,
+    buf: [u8; 0xFF8],
+    end: usize,
+    k: usize,
+}
+
+impl fmt::Debug for Entries {
+    fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result { Ok(()) }
+}
+
+impl TryFrom<File> for Entries {
+    type Error = Error;
+
+    #[inline]
+    fn try_from(file: File) -> Result<Self, Error> {
+        Ok(Self {
+            file,
+            buf: unsafe { mem::MaybeUninit::uninit().assume_init() },
+            end: 0,
+            k: 0,
+        })
+    }
+}
+
+impl Entries {
+    /// Next entry
+    pub fn next(&mut self) -> Result<Option<Entry>, Error> {
+        if self.k >= self.end {
+            let n = unsafe { esyscall!(GETDENTS, self.file.fd(), self.buf.as_mut_ptr(), self.buf.len())? };
+            if 0 == n { return Ok(None) }
+            self.end = n;
+            self.k = 0;
+        }
+
+        #[repr(C)]
+        #[derive(Clone, Copy)]
+        struct Hdr {
+            ino: usize,
+            off: usize,
+            len: u16,
+        }
+
+        Ok(Some(unsafe {
+            let k = self.k;
+            let hdr = *(self.buf.as_ptr().wrapping_add(k) as *const Hdr);
+            self.k += hdr.off;
+            let typ = self.buf[k + hdr.len as usize - 1];
+            Entry { ino: hdr.ino, typ,
+                    name: &slice::from_raw_parts(self.buf.as_ptr().wrapping_add(k),
+                                                 hdr.len as usize - 2)[mem::size_of::<Hdr>()..] }
+        }))
+    }
+}
+
+/// Directory entry
+#[repr(C)]
+#[derive(Debug)]
+pub struct Entry<'a> {
+    /// Inode number
+    pub ino: usize,
+    /// File type
+    pub typ: u8,
+    /// File name
+    pub name: &'a [u8],
 }
