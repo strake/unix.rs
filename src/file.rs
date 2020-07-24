@@ -483,9 +483,9 @@ impl From<libc::stat> for Stat {
             size: st.st_size,
             blksize: st.st_blksize,
             blocks: st.st_blocks,
-            atime: EpochTime::from_s_ns(st.st_atime, st.st_atime_nsec),
-            mtime: EpochTime::from_s_ns(st.st_mtime, st.st_mtime_nsec),
-            ctime: EpochTime::from_s_ns(st.st_ctime, st.st_ctime_nsec),
+            atime: EpochTime::from_s_ns(st.st_atime, st.st_atime_nsec as _),
+            mtime: EpochTime::from_s_ns(st.st_mtime, st.st_mtime_nsec as _),
+            ctime: EpochTime::from_s_ns(st.st_ctime, st.st_ctime_nsec as _),
         }
     }
 }
