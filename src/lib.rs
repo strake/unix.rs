@@ -40,6 +40,7 @@ mod util;
 pub use err_::Error;
 pub use env_::{Environ, environ};
 pub use file::File;
+pub use time::EpochTime;
 
 /// Null-terminated byte string, used in many Unix system interfaces
 pub type Str = ::null_terminated::Nul<u8>;
