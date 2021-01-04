@@ -1,8 +1,11 @@
 use core::convert::TryInto;
 use null_terminated::{Nul, NulStr};
 
-#[link_name = "__environ"]
-extern { pub static environ: Environ<'static>; }
+extern {
+    /// Static process environment
+    #[link_name = "__environ"]
+    pub static environ: Environ<'static>;
+}
 
 /// Process environment, conventionally an array of strings of form "key=value"
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
