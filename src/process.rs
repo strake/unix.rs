@@ -81,9 +81,9 @@ mod wait_flags { bitflags! {
 /// Notice of process termination
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct WaitInfo {
-    /** ID of terminated process */     pid: Id,
-    /** Cause of process termination */ code: WaitCode,
-    status: isize,
+    /** ID of terminated process */     pub pid: Id,
+    /** Cause of process termination */ pub code: WaitCode,
+    /** Status of terminated process */ pub status: isize,
 }
 
 impl WaitInfo {
