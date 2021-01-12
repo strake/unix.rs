@@ -30,7 +30,7 @@ pub struct File {
 impl File {
     /// Change the mode of the file.
     #[inline]
-    pub fn chmod(&self, mode: FileMode) -> Result<(), Error> {
+    pub fn chmod(&self, mode: Mode) -> Result<(), Error> {
         unsafe { esyscall_!(FCHMOD, self.fd, mode.bits) }
     }
 
@@ -111,7 +111,7 @@ pub use self::new_pipe as mk_pipe;
 /// Open the file at the given path, creating it if `f_mode` is `Some` and it isn't already there.
 #[inline]
 pub fn open_at(opt_dir: Option<&File>, path: &Str, o_mode: OpenMode,
-                 f_mode: Option<FileMode>) -> Result<File, Error> {
+                 f_mode: Option<Mode>) -> Result<File, Error> {
     unsafe { match f_mode {
         None => esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(), o_mode.0),
         Some(f_mode) => esyscall!(OPENAT, from_opt_dir(opt_dir), path.as_ptr(),
@@ -149,7 +149,7 @@ pub fn unlink_at(opt_dir: Option<&File>, path: &Str) -> Result<(), Error> {
 /// Change the mode of the file at `path`.
 #[inline]
 pub fn chmod_at(opt_dir: Option<&File>, path: &Str,
-                mode: FileMode, at_flags: AtFlags) -> Result<(), Error> {
+                mode: Mode, at_flags: AtFlags) -> Result<(), Error> {
     unsafe { esyscall_!(FCHMODAT, from_opt_dir(opt_dir), path.as_ptr(), mode.bits,
                         if at_flags.contains(AtFlags::Follow) { 0 }
                         else { libc::AT_SYMLINK_NOFOLLOW }) }
@@ -244,7 +244,7 @@ pub use self::Clobber::*;
 /// call the given `writer`, and only once it finishes (and not fails), atomically replace the file with a newly-written one.
 pub fn atomic_write_file_at<F: FnOnce(File) -> Result<T, Error>, T>
   (opt_dir: Option<&File>, path: &Str,
-   clobber: Clobber, mode: FileMode, writer: F) -> Result<T, Error> {
+   clobber: Clobber, mode: Mode, writer: F) -> Result<T, Error> {
     let mut rng = ::rand::rngs::SmallRng::from_rng(::random::OsRandom::new())
         .map_err(|_| Error::EIO)?;
 
@@ -328,7 +328,7 @@ impl fmt::Write for File {
 
 bitflags! {
     /// File mode
-    pub struct FileMode: u16 {
+    pub struct Mode: u16 {
         /// Set-user-ID flag: if a process `exec`s the file, set its effective user ID to that of the file's owner.
         const SUID = 0o4000;
         /// Set-group-ID flag: If a process `exec`s the file, set its effective group ID to that of the file's owner.
@@ -339,43 +339,49 @@ bitflags! {
         const ____ = 0o0777;
     }
 }
+#[deprecated(since = "0.6.11", note = "Rather use `Mode`")]
+pub use self::Mode as FileMode;
 
 #[allow(missing_docs)]
 mod file_permission { bitflags! {
-    pub struct FilePermission: u8 {
+    pub struct Permission: u8 {
         const Read  = 4;
         const Write = 2;
         const Exec  = 1;
     }
 } } pub use self::file_permission::*;
-pub(crate) use self::FilePermission as Perm;
+pub(crate) use self::Permission as Perm;
+#[deprecated(since = "0.6.11", note = "Rather use `Permission`")]
+pub use self::Permission as FilePermission;
 
-impl Shl<FileModeSection> for FilePermission {
-    type Output = FileMode;
+impl Shl<ModeSection> for Permission {
+    type Output = Mode;
     #[inline]
-    fn shl(self, sect: FileModeSection) -> FileMode {
-        FileMode::from_bits_truncate((self.bits() as u16) << sect.pos())
+    fn shl(self, sect: ModeSection) -> Mode {
+        Mode::from_bits_truncate((self.bits() as u16) << sect.pos())
     }
 }
 
-impl Shr<FileModeSection> for FileMode {
-    type Output = FilePermission;
+impl Shr<ModeSection> for Mode {
+    type Output = Permission;
     #[inline]
-    fn shr(self, sect: FileModeSection) -> FilePermission {
-        FilePermission::from_bits_truncate((self.bits >> sect.pos() & 3) as _)
+    fn shr(self, sect: ModeSection) -> Permission {
+        Permission::from_bits_truncate((self.bits >> sect.pos() & 3) as _)
     }
 }
 
 /// Which agent has the permissions
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum FileModeSection {
+pub enum ModeSection {
     /** Owning user  */ USR,
     /** Owning group */ GRP,
     /** All others   */ OTH,
 }
-pub use self::FileModeSection::*;
+pub use self::ModeSection::*;
+#[deprecated(since = "0.6.11", note = "Rather use `ModeSection`")]
+pub use self::ModeSection as FileModeSection;
 
-impl FileModeSection {
+impl ModeSection {
     #[inline]
     fn pos(self) -> u32 { match self { USR => 6, GRP => 3, OTH => 0 } }
 }
@@ -458,7 +464,7 @@ bitflags! {
 pub struct Stat {
     /** ID of device containing file  */ pub dev:     libc::dev_t,
     /** Inode number                  */ pub ino:     libc::ino_t,
-    /** File type and mode            */ pub mode:    FileMode,
+    /** File type and mode            */ pub mode:    Mode,
     /** Number of links               */ pub nlink:   libc::nlink_t,
     /** User ID of owner              */ pub uid:     libc::uid_t,
     /** Group ID of owner             */ pub gid:     libc::gid_t,
@@ -476,7 +482,7 @@ impl From<libc::stat> for Stat {
         Stat {
             dev: st.st_dev,
             ino: st.st_ino,
-            mode: FileMode::from_bits_truncate(st.st_mode as _),
+            mode: Mode::from_bits_truncate(st.st_mode as _),
             nlink: st.st_nlink,
             uid: st.st_uid,
             gid: st.st_gid,
