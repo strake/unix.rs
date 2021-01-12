@@ -123,7 +123,7 @@ unsafe fn do_map_file(f: &File, loc: *mut u8, perm: Perm, seg: Option<Segment>) 
 unsafe fn do_map(fd: isize, loc: *mut u8, perm: Perm, offset: u64, length: usize) ->
   Result<Map, Error> {
     let ptr = syscall!(MMAP, loc, length, Prot::from(perm).bits,
-                       if loc.is_null() { 0 } else { libc::MAP_FIXED }, fd, offset) as *mut u8;
+                       if loc.is_null() { 0 } else { libc::MAP_FIXED } | libc::MAP_SHARED as i32, fd, offset) as *mut u8;
     if (ptr as usize) > 0x1000usize.wrapping_neg() {
         Err(Error::from(NonZeroUsize::new_unchecked((ptr as usize).wrapping_neg())))
     } else { Ok(Map { ptr: ptr as *mut u8, length }) }
